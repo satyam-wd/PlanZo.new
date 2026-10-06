@@ -1,53 +1,150 @@
 // PlanZo Analytics View
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { useApp } from '../context/AppContext';
-import { MentalBandwidthMeter } from './MentalBandwidthMeter';
 import {
-  BarChart2,
+  ComposedChart,
+  Bar,
+  Line,
+  XAxis,
+  YAxis,
+  CartesianGrid,
+  Tooltip,
+  ResponsiveContainer,
+  Cell,
+  LabelList,
+} from 'recharts';
+import {
   TrendingUp,
-  CheckCircle2,
-  Heart,
   CheckSquare,
   Calendar,
+  Download,
+  Check,
+  Target,
+  Trophy,
+  Award,
+  Flame,
+  Zap,
 } from 'lucide-react';
+
+const DAILY_FOCUS_GOAL_STORAGE_KEY = 'planzo_daily_focus_goal_v1';
+
+interface DailyFocusGoalState {
+  text: string;
+  completed: boolean;
+  updatedDate: string;
+}
+
+interface DailyTaskChartDatum {
+  dateStr: string;
+  dayShort: string;
+  dateLabel: string;
+  xAxisLabel: string;
+  completedTasks: number;
+  totalTasks: number;
+  isToday: boolean;
+}
+
+const CustomTaskTooltip = ({ active, payload }: any) => {
+  if (active && payload && payload.length) {
+    const data: DailyTaskChartDatum = payload[0].payload;
+    return (
+      <div className="rounded-2xl border border-stone-200 dark:border-stone-700 bg-white dark:bg-stone-900 px-3.5 py-2.5 shadow-lg text-xs">
+        <div className="font-bold text-stone-900 dark:text-stone-100 flex items-center gap-1.5">
+          <span>{data.isToday ? 'Today' : data.dayShort}</span>
+          <span className="text-stone-400 font-mono font-normal">({data.dateLabel})</span>
+        </div>
+        <div className="mt-1 flex items-center gap-2 font-mono">
+          <span className="inline-block w-2 h-2 rounded-full bg-teal-600 dark:bg-teal-400" />
+          <span className="text-stone-600 dark:text-stone-300">Completed Tasks:</span>
+          <span className="font-bold text-teal-700 dark:text-teal-400">
+            {data.completedTasks} {data.completedTasks === 1 ? 'task' : 'tasks'}
+          </span>
+        </div>
+        {data.totalTasks > 0 && (
+          <div className="mt-0.5 text-[11px] font-mono text-stone-400">
+            Scheduled: {data.completedTasks} / {data.totalTasks} done
+          </div>
+        )}
+      </div>
+    );
+  }
+  return null;
+};
 
 export const AnalyticsView: React.FC = () => {
   const {
-    addReflection,
-    todayReflection,
+    profile,
+    bandwidth,
+    overallAttendancePercentage,
+    userXp,
+    userStreak,
     timetable,
+    toggleItemComplete,
     scheduledTasks,
     awardXp,
   } = useApp();
 
-  // Time scope: Daily, Weekly, or Monthly
-  const [timeScope, setTimeScope] = useState<'daily' | 'weekly' | 'monthly'>('weekly');
-  const [hoveredDayIndex, setHoveredDayIndex] = useState<number | null>(null);
+  const [reportExported, setReportExported] = useState(false);
 
-  // 10-second reflection slider state
-  const [energyLevel, setEnergyLevel] = useState(todayReflection?.energyLevel || 4);
-  const [focusLevel, setFocusLevel] = useState(todayReflection?.focusLevel || 4);
-  const [stressLevel, setStressLevel] = useState(todayReflection?.stressLevel || 2);
-  const [noteText, setNoteText] = useState(todayReflection?.note || '');
-  const [submitted, setSubmitted] = useState(!!todayReflection);
+  // Daily Focus Goal State persisted in localStorage
+  const [dailyFocusGoal, setDailyFocusGoal] = useState<DailyFocusGoalState>(() => {
+    const todayStr = new Date().toISOString().split('T')[0];
+    try {
+      const saved = localStorage.getItem(DAILY_FOCUS_GOAL_STORAGE_KEY);
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        return {
+          text: typeof parsed.text === 'string' ? parsed.text : '',
+          completed: parsed.updatedDate === todayStr ? Boolean(parsed.completed) : false,
+          updatedDate: todayStr,
+        };
+      }
+    } catch (e) {
+      console.error('Failed to read daily focus goal from localStorage', e);
+    }
+    return {
+      text: '',
+      completed: false,
+      updatedDate: todayStr,
+    };
+  });
 
-  const handleSaveReflection = (e: React.FormEvent) => {
-    e.preventDefault();
-    addReflection(energyLevel, focusLevel, stressLevel, noteText);
-    setSubmitted(true);
-    awardXp(15, 'Daily Reflection Recorded');
+  useEffect(() => {
+    try {
+      localStorage.setItem(DAILY_FOCUS_GOAL_STORAGE_KEY, JSON.stringify(dailyFocusGoal));
+    } catch (e) {
+      console.error('Failed to save daily focus goal to localStorage', e);
+    }
+  }, [dailyFocusGoal]);
+
+  const handleFocusGoalTextChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const newText = e.target.value;
+    const todayStr = new Date().toISOString().split('T')[0];
+    setDailyFocusGoal((prev) => ({
+      ...prev,
+      text: newText,
+      updatedDate: todayStr,
+    }));
   };
 
-  // Compute Past 7 Days Task Completion Data
-  const past7DaysTaskData = useMemo(() => {
-    const days: {
-      dateStr: string;
-      dayShort: string;
-      dateLabel: string;
-      completedTasks: number;
-      totalTasks: number;
-      isToday: boolean;
-    }[] = [];
+  const handleToggleFocusGoalComplete = () => {
+    const todayStr = new Date().toISOString().split('T')[0];
+    setDailyFocusGoal((prev) => {
+      const nextCompleted = !prev.completed;
+      if (nextCompleted && prev.text.trim()) {
+        awardXp(20, `Daily Focus Goal Achieved: ${prev.text.trim()}`);
+      }
+      return {
+        ...prev,
+        completed: nextCompleted,
+        updatedDate: todayStr,
+      };
+    });
+  };
+
+  // Compute Past 7 Days Task Completion Data for Recharts BarChart
+  const past7DaysTaskData = useMemo<DailyTaskChartDatum[]>(() => {
+    const days: DailyTaskChartDatum[] = [];
 
     const now = new Date();
     const todayStr = now.toISOString().split('T')[0];
@@ -72,6 +169,7 @@ export const AnalyticsView: React.FC = () => {
           dateStr,
           dayShort,
           dateLabel,
+          xAxisLabel: `Today (${dateLabel})`,
           completedTasks,
           totalTasks,
           isToday: true,
@@ -85,6 +183,7 @@ export const AnalyticsView: React.FC = () => {
           dateStr,
           dayShort,
           dateLabel,
+          xAxisLabel: `${dayShort} (${dateLabel})`,
           completedTasks,
           totalTasks,
           isToday: false,
@@ -104,534 +203,547 @@ export const AnalyticsView: React.FC = () => {
     );
   }, [past7DaysTaskData]);
 
-  // Dynamic Y-axis scale for the 7-day tasks completed graph
-  const yAxisMax = useMemo(() => {
-    const maxCompleted = Math.max(...past7DaysTaskData.map((d) => d.completedTasks), 0);
-    const maxTotal = Math.max(...past7DaysTaskData.map((d) => d.totalTasks), 0);
-    const referenceMax = Math.max(maxCompleted, Math.min(maxTotal, 10), 6);
-    // Round up to a clean even number for 4 horizontal grid steps
-    return Math.ceil(referenceMax / 2) * 2;
+  const maxTaskDomain = useMemo(() => {
+    const maxVal = Math.max(...past7DaysTaskData.map((d) => d.completedTasks), 4);
+    return Math.ceil((maxVal + 1) / 2) * 2;
   }, [past7DaysTaskData]);
 
-  const yAxisTicks = [
-    yAxisMax,
-    Math.round(yAxisMax * 0.75),
-    Math.round(yAxisMax * 0.5),
-    Math.round(yAxisMax * 0.25),
-    0,
-  ];
-
-  // Today's live stats for Daily view
   const todayCompletedCount = timetable.filter((t) => t.completed).length;
   const todayTotalCount = timetable.length;
   const todayAdherenceRate =
     todayTotalCount > 0 ? Math.round((todayCompletedCount / todayTotalCount) * 1000) / 10 : 0;
 
-  // Monthly stats
-  const monthlyStats = {
-    averageAdherence: 84,
-    totalFocusHours: 128,
-    codingProblemsSolved: 46,
-    lecturesAttended: 68,
-    burnoutIncidentsPrevented: 11,
-    scheduleRecalibrationsWithoutGuilt: 19,
+  // Compute Best Day, Best Week, Longest Streak of Completing Minimum 7 Tasks, and 7+ Task Target Status
+  const milestoneMetrics = useMemo(() => {
+    const todayStr = new Date().toISOString().split('T')[0];
+
+    // Collect all known dates with completed task counts
+    const dateCountMap: Record<string, number> = {};
+    for (const [dateKey, tasks] of Object.entries(scheduledTasks)) {
+      if (Array.isArray(tasks)) {
+        dateCountMap[dateKey] = tasks.filter((t) => t.completed).length;
+      }
+    }
+    // Ensure today's live count is up to date
+    dateCountMap[todayStr] = Math.max(dateCountMap[todayStr] || 0, todayCompletedCount);
+
+    // Also include all past 7 days
+    for (const d of past7DaysTaskData) {
+      dateCountMap[d.dateStr] = Math.max(dateCountMap[d.dateStr] || 0, d.completedTasks);
+    }
+
+    const sortedDates = Object.keys(dateCountMap).sort();
+
+    // 1. Best Day
+    let bestDayDate = todayStr;
+    let bestDayCount = dateCountMap[todayStr] || 0;
+    for (const dt of sortedDates) {
+      if ((dateCountMap[dt] || 0) >= bestDayCount) {
+        bestDayCount = dateCountMap[dt] || 0;
+        bestDayDate = dt;
+      }
+    }
+    const bestDayLabel =
+      bestDayDate === todayStr
+        ? 'Today'
+        : new Date(bestDayDate + 'T00:00:00').toLocaleDateString('en-US', {
+            weekday: 'short',
+            month: 'short',
+            day: 'numeric',
+          });
+
+    // 2. Best Week (max 7-day rolling window across history, or current 7-day total)
+    let bestWeekTotal = totalWeeklyTasksDone;
+    if (sortedDates.length > 0) {
+      for (let i = 0; i < sortedDates.length; i++) {
+        const startDt = new Date(sortedDates[i] + 'T00:00:00');
+        let windowSum = 0;
+        for (let offset = 0; offset < 7; offset++) {
+          const cur = new Date(startDt);
+          cur.setDate(startDt.getDate() + offset);
+          const key = cur.toISOString().split('T')[0];
+          windowSum += dateCountMap[key] || 0;
+        }
+        if (windowSum > bestWeekTotal) {
+          bestWeekTotal = windowSum;
+        }
+      }
+    }
+
+    // 3. Longest Streak of completing minimum 7 tasks/day
+    let longestMin7Streak = 0;
+    let currentRun = 0;
+    let prevDateObj: Date | null = null;
+
+    for (const dt of sortedDates) {
+      const count = dateCountMap[dt] || 0;
+      const curDateObj = new Date(dt + 'T00:00:00');
+
+      if (count >= 7) {
+        if (prevDateObj) {
+          const diffDays = Math.round(
+            (curDateObj.getTime() - prevDateObj.getTime()) / (1000 * 60 * 60 * 24)
+          );
+          if (diffDays === 1) {
+            currentRun += 1;
+          } else {
+            currentRun = 1;
+          }
+        } else {
+          currentRun = 1;
+        }
+        if (currentRun > longestMin7Streak) {
+          longestMin7Streak = currentRun;
+        }
+        prevDateObj = curDateObj;
+      } else {
+        currentRun = 0;
+        prevDateObj = null;
+      }
+    }
+
+    // 4. Days with 7+ Tasks Completed (or Active 7-Task Goal Progress Today)
+    const totalSevenPlusDays = sortedDates.filter((dt) => (dateCountMap[dt] || 0) >= 7).length;
+
+    return {
+      bestDayCount,
+      bestDayLabel,
+      bestWeekTotal,
+      longestMin7Streak,
+      totalSevenPlusDays,
+    };
+  }, [scheduledTasks, todayCompletedCount, past7DaysTaskData, totalWeeklyTasksDone]);
+
+  const handleExportSummaryReport = () => {
+    const reportDate = new Date().toLocaleString('en-IN', {
+      dateStyle: 'long',
+      timeStyle: 'short',
+    });
+    const studentName = profile.name || 'B.Tech Student';
+    const studentCollege = profile.customCollege || profile.college || 'Engineering Institute';
+    const studentBranch = profile.branch || 'Computer Science & Engineering';
+    const studentSemester = profile.semester || 1;
+
+    const sevenDayBreakdownLines = past7DaysTaskData
+      .map(
+        (d) =>
+          `  - ${d.dayShort.padEnd(4)} (${d.dateLabel.padEnd(6)}): ${d.completedTasks} completed${
+            d.totalTasks > 0 ? ` / ${d.totalTasks} scheduled` : ''
+          }${d.isToday ? ' [TODAY]' : ''}`
+      )
+      .join('\n');
+
+    const completedTodayList =
+      timetable
+        .filter((t) => t.completed)
+        .map((t) => `  [x] ${t.startTime} - ${t.endTime}: ${t.title} (${t.category.toUpperCase()})`)
+        .join('\n') || '  (No tasks marked completed yet today)';
+
+    const pendingTodayList =
+      timetable
+        .filter((t) => !t.completed)
+        .map((t) => `  [ ] ${t.startTime} - ${t.endTime}: ${t.title} (${t.category.toUpperCase()})`)
+        .join('\n') || '  (All scheduled tasks completed for today!)';
+
+    const reportContent = `====================================================================
+           PLANZO ACADEMIC & STUDY PERFORMANCE SUMMARY REPORT
+====================================================================
+Generated On      : ${reportDate}
+Student Name      : ${studentName}
+Institute         : ${studentCollege}
+Branch & Semester : ${studentBranch} — Semester ${studentSemester}
+====================================================================
+
+1. OVERALL STUDENT VITALS & GAMIFICATION
+--------------------------------------------------------------------
+- Overall Attendance : ${overallAttendancePercentage}%
+- Experience (XP)    : ${userXp} XP
+- Active Streak      : ${userStreak} Day(s)
+
+2. TODAY'S TASK PERFORMANCE (${new Date().toISOString().split('T')[0]})
+--------------------------------------------------------------------
+- Daily Focus Goal   : ${dailyFocusGoal.text.trim() ? `"${dailyFocusGoal.text.trim()}" [${dailyFocusGoal.completed ? 'COMPLETED' : 'IN PROGRESS'}]` : 'Not set'}
+- Tasks Completed    : ${todayCompletedCount} of ${todayTotalCount} (${todayAdherenceRate}%)
+- Study Time Planned : ${bandwidth.totalStudyMinutes} mins
+- Lab Time Planned   : ${bandwidth.totalLabMinutes} mins
+- Buffer / Rest Time : ${bandwidth.bufferMinutes} mins
+
+Completed Tasks Today:
+${completedTodayList}
+
+Pending Tasks Today:
+${pendingTodayList}
+
+3. PROGRESS CHART OF LAST SEVEN DAYS
+--------------------------------------------------------------------
+- 7-Day Total Completed : ${totalWeeklyTasksDone} tasks
+- Daily Average         : ${averageDailyTasksDone} tasks/day
+- Most Productive Day   : ${peakTaskDay.isToday ? 'Today' : `${peakTaskDay.dayShort} (${peakTaskDay.dateLabel})`} (${peakTaskDay.completedTasks} tasks)
+
+Day-by-Day Record:
+${sevenDayBreakdownLines}
+====================================================================
+`;
+
+    const blob = new Blob([reportContent], { type: 'text/plain;charset=utf-8' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    const dateStamp = new Date().toISOString().split('T')[0];
+    link.href = url;
+    link.download = `PlanZo-Study-Performance-Report-${dateStamp}.txt`;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(url);
+
+    setReportExported(true);
+    awardXp(10, 'Exported Study Performance Summary Report');
+    setTimeout(() => setReportExported(false), 3000);
   };
 
   return (
     <div className="space-y-6">
-      {/* 1. Header with Time Scope Selector */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 p-5 rounded-3xl bg-white dark:bg-stone-900 border border-stone-200 dark:border-stone-800 shadow-xs">
-        <div>
-          <h2 className="text-base sm:text-lg font-bold text-stone-900 dark:text-stone-100 flex items-center gap-2">
-            <BarChart2 className="w-5 h-5 text-teal-700 dark:text-teal-400" />
-            <span>Behavioral Analytics & Task Progress</span>
-          </h2>
-          <p className="text-xs text-stone-500 dark:text-stone-400 mt-0.5">
-            Track your daily completed tasks, focus consistency, and cognitive bandwidth across the semester.
-          </p>
+      {/* 1. Concise Table of Tasks (Completed tasks marked, uncompleted tasks unmarked) */}
+      <div className="rounded-2xl bg-white dark:bg-stone-900 border border-stone-200 dark:border-stone-800 p-3.5 sm:p-4 shadow-xs space-y-2.5">
+        <div className="flex items-center justify-between gap-2">
+          <div className="flex items-center gap-2">
+            <CheckSquare className="w-4 h-4 text-teal-700 dark:text-teal-400" />
+            <h2 className="text-xs sm:text-sm font-bold text-stone-900 dark:text-stone-100">
+              Today&apos;s Tasks
+            </h2>
+            <span className="px-2 py-0.5 rounded-md text-[10px] font-mono font-semibold bg-stone-100 dark:bg-stone-800 text-stone-600 dark:text-stone-300">
+              {todayCompletedCount}/{todayTotalCount} Done
+            </span>
+          </div>
+
+          <button
+            onClick={handleExportSummaryReport}
+            className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-xl text-[11px] font-semibold border transition-all cursor-pointer ${
+              reportExported
+                ? 'bg-emerald-600 text-white border-emerald-600'
+                : 'bg-teal-700 hover:bg-teal-800 text-white border-teal-700'
+            }`}
+            title="Download summary report"
+          >
+            {reportExported ? (
+              <>
+                <Check className="w-3 h-3" />
+                <span>Saved</span>
+              </>
+            ) : (
+              <>
+                <Download className="w-3 h-3" />
+                <span>Export Report</span>
+              </>
+            )}
+          </button>
         </div>
 
-        {/* Time Scope Segmented Control */}
-        <div className="flex items-center p-1 rounded-2xl bg-stone-100 dark:bg-stone-800 border border-stone-200 dark:border-stone-750 shrink-0">
-          <button
-            onClick={() => setTimeScope('daily')}
-            className={`px-3 py-1.5 rounded-xl text-xs font-semibold transition-all cursor-pointer ${
-              timeScope === 'daily'
-                ? 'bg-white dark:bg-stone-700 text-stone-900 dark:text-stone-100 shadow-xs'
-                : 'text-stone-500 dark:text-stone-400 hover:text-stone-800'
+        {/* Ultra-Concise Tasks Table */}
+        <div className="max-h-44 overflow-y-auto rounded-xl border border-stone-200/80 dark:border-stone-800">
+          <table className="w-full text-left border-collapse text-[11px]">
+            <thead className="sticky top-0 z-10 bg-stone-50 dark:bg-stone-800 text-stone-500 dark:text-stone-400 border-b border-stone-200/80 dark:border-stone-800">
+              <tr>
+                <th className="py-1.5 px-2.5 font-semibold w-8 text-center">✓</th>
+                <th className="py-1.5 px-2.5 font-semibold">Task</th>
+                <th className="py-1.5 px-2.5 font-semibold text-right w-24">Time</th>
+                <th className="py-1.5 px-2.5 font-semibold text-right w-20">Status</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-stone-100 dark:divide-stone-800/60">
+              {timetable.length === 0 ? (
+                <tr>
+                  <td colSpan={4} className="py-3 text-center text-stone-400">
+                    No tasks for today.
+                  </td>
+                </tr>
+              ) : (
+                timetable.map((item) => (
+                  <tr
+                    key={item.id}
+                    onClick={() => toggleItemComplete(item.id)}
+                    className={`transition-colors cursor-pointer ${
+                      item.completed
+                        ? 'bg-emerald-50/30 dark:bg-emerald-950/15'
+                        : 'hover:bg-stone-50 dark:hover:bg-stone-800/40'
+                    }`}
+                  >
+                    <td className="py-1.5 px-2.5 text-center">
+                      <input
+                        type="checkbox"
+                        checked={item.completed}
+                        onChange={() => toggleItemComplete(item.id)}
+                        onClick={(e) => e.stopPropagation()}
+                        aria-label={`Mark ${item.title} as completed`}
+                        className="w-3.5 h-3.5 rounded border-stone-300 dark:border-stone-700 text-teal-700 accent-teal-600 cursor-pointer align-middle"
+                      />
+                    </td>
+                    <td className="py-1.5 px-2.5 font-medium max-w-[200px] sm:max-w-md truncate">
+                      <span
+                        className={
+                          item.completed
+                            ? 'line-through text-stone-400 dark:text-stone-500'
+                            : 'text-stone-800 dark:text-stone-200'
+                        }
+                      >
+                        {item.title}
+                      </span>
+                    </td>
+                    <td className="py-1.5 px-2.5 font-mono text-[10px] text-stone-400 text-right whitespace-nowrap">
+                      {item.startTime}
+                    </td>
+                    <td className="py-1.5 px-2.5 text-right whitespace-nowrap">
+                      {item.completed ? (
+                        <span className="inline-flex items-center gap-0.5 text-[10px] font-mono font-bold text-emerald-600 dark:text-emerald-400">
+                          <Check className="w-2.5 h-2.5" />
+                          Done
+                        </span>
+                      ) : (
+                        <span className="text-[10px] font-mono text-stone-400 dark:text-stone-500">
+                          Pending
+                        </span>
+                      )}
+                    </td>
+                  </tr>
+                ))
+              )}
+            </tbody>
+          </table>
+        </div>
+
+        {/* Compact Daily Focus Goal Row */}
+        <div className="pt-1 flex items-center gap-2">
+          <input
+            type="checkbox"
+            checked={dailyFocusGoal.completed}
+            onChange={handleToggleFocusGoalComplete}
+            aria-label="Mark Daily Focus Goal as completed"
+            className="w-3.5 h-3.5 rounded border-stone-300 dark:border-stone-700 text-teal-700 accent-teal-600 cursor-pointer shrink-0"
+          />
+          <Target className="w-3.5 h-3.5 text-teal-700 dark:text-teal-400 shrink-0" />
+          <span className="text-[11px] font-bold text-stone-700 dark:text-stone-300 shrink-0">
+            Focus Goal:
+          </span>
+          <input
+            type="text"
+            value={dailyFocusGoal.text}
+            onChange={handleFocusGoalTextChange}
+            placeholder="Set today's #1 focus goal..."
+            className={`w-full rounded-lg bg-stone-50 dark:bg-stone-800/80 border border-stone-200 dark:border-stone-700 px-2.5 py-1 text-[11px] focus:outline-hidden focus:border-teal-500 ${
+              dailyFocusGoal.completed
+                ? 'line-through text-stone-400 dark:text-stone-500'
+                : 'text-stone-900 dark:text-stone-100 placeholder-stone-400'
             }`}
-          >
-            Daily
-          </button>
-          <button
-            onClick={() => setTimeScope('weekly')}
-            className={`px-3 py-1.5 rounded-xl text-xs font-semibold transition-all cursor-pointer ${
-              timeScope === 'weekly'
-                ? 'bg-white dark:bg-stone-700 text-stone-900 dark:text-stone-100 shadow-xs'
-                : 'text-stone-500 dark:text-stone-400 hover:text-stone-800'
-            }`}
-          >
-            Weekly (7 Days)
-          </button>
-          <button
-            onClick={() => setTimeScope('monthly')}
-            className={`px-3 py-1.5 rounded-xl text-xs font-semibold transition-all cursor-pointer ${
-              timeScope === 'monthly'
-                ? 'bg-white dark:bg-stone-700 text-stone-900 dark:text-stone-100 shadow-xs'
-                : 'text-stone-500 dark:text-stone-400 hover:text-stone-800'
-            }`}
-          >
-            Monthly (30 Days)
-          </button>
+          />
         </div>
       </div>
 
-      {/* 2. Real-Time Mental Energy & Cognitive Load Engine */}
-      <MentalBandwidthMeter />
-
-      {/* 3. TIME SCOPE SPECIFIC VIEWS */}
-
-      {/* DAILY VIEW */}
-      {timeScope === 'daily' && (
-        <div className="space-y-6 animate-fadeIn">
-          {/* Today's Metrics Grid */}
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-            <div className="p-4 rounded-2xl border border-stone-200 dark:border-stone-800 bg-white dark:bg-stone-900 shadow-xs">
-              <span className="text-[11px] font-semibold uppercase tracking-wider text-stone-400">
-                Tasks Completed Today
-              </span>
-              <div className="text-2xl font-bold font-mono text-teal-700 dark:text-teal-400 mt-1">
-                {todayCompletedCount} / {todayTotalCount}
-              </div>
-              <p className="text-xs text-stone-500 mt-1">
-                {todayAdherenceRate}% of today&apos;s scheduled tasks finished
-              </p>
-            </div>
-
-            <div className="p-4 rounded-2xl border border-stone-200 dark:border-stone-800 bg-white dark:bg-stone-900 shadow-xs">
-              <span className="text-[11px] font-semibold uppercase tracking-wider text-stone-400">
-                Deep Work & Study Time
-              </span>
-              <div className="text-2xl font-bold font-mono text-stone-900 dark:text-stone-100 mt-1">
-                4 hrs 15 mins
-              </div>
-              <p className="text-xs text-stone-500 mt-1">DSA Sprint + Core Subject revision</p>
-            </div>
-
-            <div className="p-4 rounded-2xl border border-stone-200 dark:border-stone-800 bg-white dark:bg-stone-900 shadow-xs">
-              <span className="text-[11px] font-semibold uppercase tracking-wider text-stone-400">
-                Guilt-Free Buffer Time
-              </span>
-              <div className="text-2xl font-bold font-mono text-amber-600 dark:text-amber-400 mt-1">
-                45 mins
-              </div>
-              <p className="text-xs text-stone-500 mt-1">Restorative chill blocks active</p>
-            </div>
-          </div>
+      {/* 2. Tagline: Progress Chart of Last Seven Days */}
+      <div className="px-1 pt-1 flex items-center justify-between">
+        <div className="flex items-center gap-2">
+          <TrendingUp className="w-4 h-4 text-teal-700 dark:text-teal-400" />
+          <h3 className="text-sm sm:text-base font-bold tracking-tight text-stone-900 dark:text-stone-100">
+            Progress Chart of Last Seven Days
+          </h3>
         </div>
-      )}
+        <span className="text-xs font-mono text-stone-500 dark:text-stone-400">
+          {totalWeeklyTasksDone} tasks completed · Avg {averageDailyTasksDone}/day
+        </span>
+      </div>
 
-      {/* WEEKLY VIEW: Proper Graph Showing Tasks Completed Per Day */}
-      {timeScope === 'weekly' && (
-        <div className="space-y-6 animate-fadeIn">
-          <div className="rounded-3xl border border-stone-200 dark:border-stone-800 bg-white dark:bg-stone-900 p-5 sm:p-6 shadow-xs space-y-5">
-            {/* Graph Header */}
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-              <div>
-                <div className="flex items-center gap-2">
-                  <TrendingUp className="w-4 h-4 text-teal-700 dark:text-teal-400" />
-                  <h3 className="text-xs sm:text-sm font-bold uppercase tracking-wider text-stone-900 dark:text-stone-100">
-                    Past 7 Days Task Completion Graph
-                  </h3>
-                </div>
-                <p className="text-xs text-stone-500 dark:text-stone-400 mt-0.5">
-                  Number of tasks completed on each particular day over the last 7 days
-                </p>
-              </div>
-
-              <div className="flex items-center gap-3 self-start sm:self-auto">
-                <div className="px-3 py-1.5 rounded-xl bg-teal-50 dark:bg-teal-950/50 border border-teal-200/70 dark:border-teal-900/70 flex items-center gap-2">
-                  <CheckSquare className="w-3.5 h-3.5 text-teal-700 dark:text-teal-400" />
-                  <span className="text-xs font-mono font-bold text-teal-800 dark:text-teal-300">
-                    {totalWeeklyTasksDone} Tasks Done
-                  </span>
-                </div>
-                <span className="text-xs font-mono text-stone-400">
-                  Avg: {averageDailyTasksDone}/day
-                </span>
-              </div>
-            </div>
-
-            {/* Proper Cartesian Coordinate Graph (Y-Axis + Gridlines + SVG Trend Curve + Bars + X-Axis) */}
-            <div className="pt-2">
-              <div className="flex gap-3">
-                {/* Y-Axis Labels (Task Count) */}
-                <div className="flex flex-col justify-between h-56 pb-11 text-[11px] font-mono text-stone-400 dark:text-stone-500 select-none text-right pr-1 w-9 shrink-0">
-                  {yAxisTicks.map((tick, idx) => (
-                    <span key={idx} className="leading-none">
-                      {tick}
-                    </span>
-                  ))}
-                </div>
-
-                {/* Plot Canvas */}
-                <div className="relative flex-1 h-56 flex flex-col">
-                  {/* Plot Area with Horizontal Gridlines */}
-                  <div className="relative flex-1 border-l border-b border-stone-200 dark:border-stone-800">
-                    {/* Horizontal Reference Grid Lines */}
-                    <div className="absolute inset-0 flex flex-col justify-between pointer-events-none">
-                      {yAxisTicks.map((_, idx) => (
-                        <div
-                          key={idx}
-                          className={`w-full border-t ${
-                            idx === yAxisTicks.length - 1
-                              ? 'border-transparent'
-                              : 'border-dashed border-stone-200/80 dark:border-stone-800/80'
-                          }`}
-                        />
-                      ))}
-                    </div>
-
-                    {/* SVG Area & Line Overlay Connecting Daily Task Counts */}
-                    <svg
-                      viewBox="0 0 700 200"
-                      preserveAspectRatio="none"
-                      className="absolute inset-0 w-full h-full overflow-visible pointer-events-none z-10"
-                    >
-                      <defs>
-                        <linearGradient id="taskAreaGrad" x1="0" y1="0" x2="0" y2="1">
-                          <stop offset="0%" stopColor="#0f766e" stopOpacity="0.22" />
-                          <stop offset="100%" stopColor="#0f766e" stopOpacity="0.0" />
-                        </linearGradient>
-                      </defs>
-
-                      {(() => {
-                        const points = past7DaysTaskData.map((d, idx) => {
-                          const x = idx * 100 + 50;
-                          const ratio = Math.min(1, d.completedTasks / Math.max(1, yAxisMax));
-                          const y = 200 - ratio * 184 - 8;
-                          return { x, y, ...d };
-                        });
-
-                        const polylinePoints = points.map((p) => `${p.x},${p.y}`).join(' ');
-                        const areaPoints = `50,200 ${polylinePoints} 650,200`;
-
-                        return (
-                          <>
-                            <polygon points={areaPoints} fill="url(#taskAreaGrad)" />
-                            <polyline
-                              fill="none"
-                              stroke="#14b8a6"
-                              strokeWidth="2.5"
-                              strokeLinecap="round"
-                              strokeLinejoin="round"
-                              points={polylinePoints}
-                            />
-                          </>
-                        );
-                      })()}
-                    </svg>
-
-                    {/* 7 Daily Columns with Bars & Data Points */}
-                    <div className="relative z-20 grid grid-cols-7 h-full items-end">
-                      {past7DaysTaskData.map((item, idx) => {
-                        const heightPct = Math.min(
-                          100,
-                          Math.round((item.completedTasks / Math.max(1, yAxisMax)) * 92)
-                        );
-                        const isHovered = hoveredDayIndex === idx;
-
-                        return (
-                          <div
-                            key={item.dateStr}
-                            onMouseEnter={() => setHoveredDayIndex(idx)}
-                            onMouseLeave={() => setHoveredDayIndex(null)}
-                            className="relative h-full flex flex-col items-center justify-end px-1.5 sm:px-3 group cursor-pointer"
-                          >
-                            {/* Floating Tooltip / Pill showing exact task count */}
-                            <div
-                              className={`mb-1.5 px-2 py-0.5 rounded-lg text-[11px] font-mono font-bold transition-all ${
-                                item.isToday || isHovered
-                                  ? 'bg-teal-700 text-white shadow-xs scale-105'
-                                  : item.completedTasks > 0
-                                  ? 'bg-stone-100 dark:bg-stone-800 text-stone-700 dark:text-stone-200'
-                                  : 'text-stone-400 dark:text-stone-500'
-                              }`}
-                            >
-                              {item.completedTasks} {item.completedTasks === 1 ? 'task' : 'tasks'}
-                            </div>
-
-                            {/* Vertical Bar */}
-                            <div className="w-full max-w-[42px] h-[82%] flex items-end justify-center">
-                              <div
-                                className={`w-full rounded-t-xl transition-all duration-500 relative ${
-                                  item.isToday
-                                    ? 'bg-gradient-to-t from-teal-700 to-emerald-500 shadow-sm'
-                                    : item.completedTasks > 0
-                                    ? 'bg-teal-600/75 dark:bg-teal-500/70 group-hover:bg-teal-600'
-                                    : 'bg-stone-200 dark:bg-stone-800'
-                                }`}
-                                style={{
-                                  height: item.completedTasks > 0 ? `${Math.max(heightPct, 10)}%` : '4px',
-                                }}
-                              />
-                            </div>
-                          </div>
-                        );
-                      })}
-                    </div>
-                  </div>
-
-                  {/* X-Axis Labels (Day Name & Date) */}
-                  <div className="grid grid-cols-7 pt-2.5 h-11">
-                    {past7DaysTaskData.map((item) => (
-                      <div key={item.dateStr} className="flex flex-col items-center text-center">
-                        <span
-                          className={`text-xs leading-tight ${
-                            item.isToday
-                              ? 'font-bold text-teal-700 dark:text-teal-400'
-                              : 'font-medium text-stone-600 dark:text-stone-300'
-                          }`}
-                        >
-                          {item.isToday ? 'Today' : item.dayShort}
-                        </span>
-                        <span className="text-[10px] font-mono text-stone-400 dark:text-stone-500">
-                          {item.dateLabel}
-                        </span>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              </div>
-            </div>
-
-            {/* Graph Summary Footer */}
-            <div className="pt-3 border-t border-stone-100 dark:border-stone-800 flex flex-wrap items-center justify-between gap-3 text-xs text-stone-500 dark:text-stone-400">
-              <span className="flex items-center gap-1.5">
-                <Calendar className="w-3.5 h-3.5 text-teal-700 dark:text-teal-400" />
-                <span>
-                  Today&apos;s Progress:{' '}
-                  <strong className="text-stone-900 dark:text-stone-100">
-                    {todayCompletedCount} of {todayTotalCount} tasks done
-                  </strong>
-                </span>
-              </span>
-              <span>
-                Most Productive Day:{' '}
-                <strong className="text-stone-900 dark:text-stone-100">
-                  {peakTaskDay.isToday ? 'Today' : `${peakTaskDay.dayShort} (${peakTaskDay.dateLabel})`} —{' '}
-                  {peakTaskDay.completedTasks} {peakTaskDay.completedTasks === 1 ? 'task' : 'tasks'}
-                </strong>
-              </span>
-              <span>
-                7-Day Total:{' '}
-                <strong className="text-teal-700 dark:text-teal-400">
-                  {totalWeeklyTasksDone} tasks completed
-                </strong>
-              </span>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* MONTHLY VIEW */}
-      {timeScope === 'monthly' && (
-        <div className="space-y-6 animate-fadeIn">
-          {/* Monthly KPI Stats Grid */}
-          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
-            <div className="p-3.5 rounded-2xl border border-stone-200 dark:border-stone-800 bg-white dark:bg-stone-900">
-              <span className="text-[10px] uppercase font-semibold text-stone-400">Monthly Adherence</span>
-              <div className="text-xl font-bold font-mono text-teal-700 dark:text-teal-400 mt-1">
-                {monthlyStats.averageAdherence}%
-              </div>
-            </div>
-
-            <div className="p-3.5 rounded-2xl border border-stone-200 dark:border-stone-800 bg-white dark:bg-stone-900">
-              <span className="text-[10px] uppercase font-semibold text-stone-400">Total Focus Time</span>
-              <div className="text-xl font-bold font-mono text-stone-900 dark:text-stone-100 mt-1">
-                {monthlyStats.totalFocusHours} hrs
-              </div>
-            </div>
-
-            <div className="p-3.5 rounded-2xl border border-stone-200 dark:border-stone-800 bg-white dark:bg-stone-900">
-              <span className="text-[10px] uppercase font-semibold text-stone-400">DSA Solved</span>
-              <div className="text-xl font-bold font-mono text-emerald-600 dark:text-emerald-400 mt-1">
-                {monthlyStats.codingProblemsSolved} Ques
-              </div>
-            </div>
-
-            <div className="p-3.5 rounded-2xl border border-stone-200 dark:border-stone-800 bg-white dark:bg-stone-900">
-              <span className="text-[10px] uppercase font-semibold text-stone-400">Lectures Attended</span>
-              <div className="text-xl font-bold font-mono text-sky-600 dark:text-sky-400 mt-1">
-                {monthlyStats.lecturesAttended}
-              </div>
-            </div>
-
-            <div className="p-3.5 rounded-2xl border border-stone-200 dark:border-stone-800 bg-white dark:bg-stone-900">
-              <span className="text-[10px] uppercase font-semibold text-stone-400">Burnout Defenses</span>
-              <div className="text-xl font-bold font-mono text-amber-600 dark:text-amber-400 mt-1">
-                {monthlyStats.burnoutIncidentsPrevented} Buffers
-              </div>
-            </div>
-
-            <div className="p-3.5 rounded-2xl border border-stone-200 dark:border-stone-800 bg-white dark:bg-stone-900">
-              <span className="text-[10px] uppercase font-semibold text-stone-400">Auto Rebalances</span>
-              <div className="text-xl font-bold font-mono text-teal-700 dark:text-teal-400 mt-1">
-                {monthlyStats.scheduleRecalibrationsWithoutGuilt} times
-              </div>
-            </div>
-          </div>
-
-          {/* 30-Day Consistency Heatmap Grid */}
-          <div className="rounded-3xl border border-stone-200 dark:border-stone-800 bg-white dark:bg-stone-900 p-5 sm:p-6 shadow-xs space-y-3">
-            <h3 className="text-xs font-bold uppercase tracking-wider text-stone-900 dark:text-stone-100">
-              30-Day Routine Consistency Matrix
-            </h3>
-            <div className="grid grid-cols-10 sm:grid-cols-15 gap-2 pt-2">
-              {Array.from({ length: 30 }).map((_, i) => {
-                const level = (i * 7 + 13) % 4;
-                const colors = [
-                  'bg-stone-100 dark:bg-stone-800',
-                  'bg-teal-200 dark:bg-teal-950',
-                  'bg-teal-400 dark:bg-teal-700',
-                  'bg-teal-600 dark:bg-teal-500',
-                ];
-                return (
-                  <div
-                    key={i}
-                    className={`h-8 rounded-lg ${colors[level]} transition-transform hover:scale-110 flex items-center justify-center text-[10px] font-mono text-stone-600 dark:text-stone-300`}
-                    title={`Day ${i + 1}: ${level === 3 ? '100% Adherence' : level === 2 ? '75% Adherence' : 'Rest / Recalibrated'}`}
-                  >
-                    {i + 1}
-                  </div>
-                );
-              })}
-            </div>
-            <div className="flex items-center gap-2 pt-2 text-[11px] text-stone-400 justify-end">
-              <span>Less</span>
-              <span className="w-3 h-3 rounded bg-stone-100 dark:bg-stone-800" />
-              <span className="w-3 h-3 rounded bg-teal-200 dark:bg-teal-950" />
-              <span className="w-3 h-3 rounded bg-teal-400 dark:bg-teal-700" />
-              <span className="w-3 h-3 rounded bg-teal-600 dark:bg-teal-500" />
-              <span>More</span>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* 4. 10-Second Daily Cognitive Reflection Form */}
-      <div className="rounded-3xl border border-stone-200/90 dark:border-stone-800 bg-white dark:bg-stone-900 p-5 sm:p-6 shadow-xs">
-        <div className="flex items-center justify-between mb-2">
-          <div className="flex items-center gap-2">
-            <Heart className="w-4 h-4 text-rose-500" />
-            <h3 className="text-sm font-bold text-stone-900 dark:text-stone-100">
-              10-Second End-of-Day Cognitive Check-in
-            </h3>
-          </div>
-          {submitted && (
-            <span className="text-xs text-emerald-600 dark:text-emerald-400 flex items-center gap-1 font-semibold">
-              <CheckCircle2 className="w-3.5 h-3.5" />
-              <span>Calibrated for tomorrow</span>
-            </span>
-          )}
-        </div>
-
-        <p className="text-xs text-stone-500 dark:text-stone-400 mb-4">
-          A quick slider check-in feeds directly into your Mental Bandwidth Engine so tomorrow&apos;s schedule auto-adjusts to your fatigue levels without guilt.
-        </p>
-
-        <form onSubmit={handleSaveReflection} className="space-y-4">
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-            {/* Energy Slider */}
-            <div className="p-3.5 rounded-2xl bg-stone-50 dark:bg-stone-800/60 border border-stone-100 dark:border-stone-800 space-y-2">
-              <div className="flex items-center justify-between text-xs">
-                <span className="font-semibold text-stone-700 dark:text-stone-300">Physical Energy</span>
-                <span className="font-mono text-teal-700 dark:text-teal-400 font-bold">{energyLevel}/5</span>
-              </div>
-              <input
-                type="range"
-                min="1"
-                max="5"
-                value={energyLevel}
-                onChange={(e) => {
-                  setEnergyLevel(Number(e.target.value));
-                  setSubmitted(false);
-                }}
-                className="w-full accent-teal-600 cursor-pointer"
-              />
-              <div className="flex justify-between text-[10px] text-stone-400">
-                <span>Drained</span>
-                <span>Vibrant</span>
-              </div>
-            </div>
-
-            {/* Mental Focus Slider */}
-            <div className="p-3.5 rounded-2xl bg-stone-50 dark:bg-stone-800/60 border border-stone-100 dark:border-stone-800 space-y-2">
-              <div className="flex items-center justify-between text-xs">
-                <span className="font-semibold text-stone-700 dark:text-stone-300">Mental Focus</span>
-                <span className="font-mono text-teal-700 dark:text-teal-400 font-bold">{focusLevel}/5</span>
-              </div>
-              <input
-                type="range"
-                min="1"
-                max="5"
-                value={focusLevel}
-                onChange={(e) => {
-                  setFocusLevel(Number(e.target.value));
-                  setSubmitted(false);
-                }}
-                className="w-full accent-teal-600 cursor-pointer"
-              />
-              <div className="flex justify-between text-[10px] text-stone-400">
-                <span>Scattered</span>
-                <span>Deep Flow</span>
-              </div>
-            </div>
-
-            {/* Cognitive Stress Slider */}
-            <div className="p-3.5 rounded-2xl bg-stone-50 dark:bg-stone-800/60 border border-stone-100 dark:border-stone-800 space-y-2">
-              <div className="flex items-center justify-between text-xs">
-                <span className="font-semibold text-stone-700 dark:text-stone-300">Academic Pressure</span>
-                <span className="font-mono text-amber-600 dark:text-amber-400 font-bold">{stressLevel}/5</span>
-              </div>
-              <input
-                type="range"
-                min="1"
-                max="5"
-                value={stressLevel}
-                onChange={(e) => {
-                  setStressLevel(Number(e.target.value));
-                  setSubmitted(false);
-                }}
-                className="w-full accent-amber-500 cursor-pointer"
-              />
-              <div className="flex justify-between text-[10px] text-stone-400">
-                <span>Calm</span>
-                <span>Exam Overload</span>
-              </div>
-            </div>
-          </div>
-
-          {/* Quick optional note */}
-          <div className="flex flex-col sm:flex-row items-center gap-2">
-            <input
-              type="text"
-              value={noteText}
-              onChange={(e) => {
-                setNoteText(e.target.value);
-                setSubmitted(false);
-              }}
-              placeholder="Optional: How did your coursework and habits feel today?"
-              className="w-full sm:flex-1 rounded-2xl bg-stone-50 dark:bg-stone-800 border border-stone-200 dark:border-stone-700 px-4 py-2.5 text-xs text-stone-900 dark:text-stone-100 placeholder-stone-400 focus:outline-hidden focus:border-teal-500"
-            />
-            <button
-              type="submit"
-              className="w-full sm:w-auto px-5 py-2.5 rounded-2xl bg-teal-700 text-white hover:bg-teal-800 text-xs font-semibold shrink-0 transition-colors shadow-xs cursor-pointer"
+      {/* 3. Recharts Composed Chart Showing Completed Tasks Bars + Trend Line Over Blocks */}
+      <div className="rounded-3xl border border-stone-200 dark:border-stone-800 bg-white dark:bg-stone-900 p-5 sm:p-6 shadow-xs space-y-5">
+        <div className="w-full h-72 pt-2">
+          <ResponsiveContainer width="100%" height="100%">
+            <ComposedChart
+              data={past7DaysTaskData}
+              margin={{ top: 24, right: 16, left: -12, bottom: 8 }}
+              barSize={38}
             >
-              {submitted ? 'Update Reflection' : 'Save & Balance Tomorrow'}
-            </button>
+              <CartesianGrid
+                strokeDasharray="3 3"
+                vertical={false}
+                stroke="#78716c"
+                strokeOpacity={0.2}
+              />
+              <XAxis
+                dataKey="xAxisLabel"
+                axisLine={false}
+                tickLine={false}
+                tick={{ fill: '#78716c', fontSize: 11, fontFamily: 'JetBrains Mono, monospace' }}
+                dy={8}
+              />
+              <YAxis
+                allowDecimals={false}
+                domain={[0, maxTaskDomain]}
+                axisLine={false}
+                tickLine={false}
+                tick={{ fill: '#78716c', fontSize: 11, fontFamily: 'JetBrains Mono, monospace' }}
+              />
+              <Tooltip
+                content={<CustomTaskTooltip />}
+                cursor={{ fill: 'rgba(20, 184, 166, 0.08)', radius: 12 }}
+              />
+              <Bar
+                dataKey="completedTasks"
+                name="Completed Tasks"
+                radius={[10, 10, 4, 4]}
+                animationDuration={650}
+              >
+                {past7DaysTaskData.map((entry) => (
+                  <Cell
+                    key={entry.dateStr}
+                    fill={
+                      entry.isToday
+                        ? '#0f766e'
+                        : entry.completedTasks > 0
+                        ? '#14b8a6'
+                        : '#d6d3d1'
+                    }
+                  />
+                ))}
+                <LabelList
+                  dataKey="completedTasks"
+                  position="top"
+                  offset={10}
+                  formatter={(val: number) => `${val}`}
+                  style={{
+                    fill: '#0f766e',
+                    fontSize: 11,
+                    fontWeight: 700,
+                    fontFamily: 'JetBrains Mono, monospace',
+                  }}
+                />
+              </Bar>
+              <Line
+                type="monotone"
+                dataKey="completedTasks"
+                name="Trend"
+                stroke="#f59e0b"
+                strokeWidth={2.5}
+                dot={{
+                  r: 4,
+                  fill: '#f59e0b',
+                  stroke: '#ffffff',
+                  strokeWidth: 2,
+                }}
+                activeDot={{
+                  r: 6,
+                  fill: '#d97706',
+                  stroke: '#ffffff',
+                  strokeWidth: 2,
+                }}
+                animationDuration={800}
+              />
+            </ComposedChart>
+          </ResponsiveContainer>
+        </div>
+
+        {/* Graph Summary Footer */}
+        <div className="pt-3 border-t border-stone-100 dark:border-stone-800 flex flex-wrap items-center justify-between gap-3 text-xs text-stone-500 dark:text-stone-400">
+          <span className="flex items-center gap-1.5">
+            <Calendar className="w-3.5 h-3.5 text-teal-700 dark:text-teal-400" />
+            <span>
+              Today&apos;s Progress:{' '}
+              <strong className="text-stone-900 dark:text-stone-100">
+                {todayCompletedCount} of {todayTotalCount} tasks done
+              </strong>
+            </span>
+          </span>
+          <span>
+            Most Productive Day:{' '}
+            <strong className="text-stone-900 dark:text-stone-100">
+              {peakTaskDay.isToday ? 'Today' : `${peakTaskDay.dayShort} (${peakTaskDay.dateLabel})`} —{' '}
+              {peakTaskDay.completedTasks} {peakTaskDay.completedTasks === 1 ? 'task' : 'tasks'}
+            </strong>
+          </span>
+          <span>
+            7-Day Total:{' '}
+            <strong className="text-teal-700 dark:text-teal-400">
+              {totalWeeklyTasksDone} tasks completed
+            </strong>
+          </span>
+        </div>
+      </div>
+
+      {/* 4. Four Icons Milestone Table: Best Day, Best Week, Longest Streak (Min 7 Tasks), and Min 7 Tasks Daily Target */}
+      <div className="rounded-2xl border border-stone-200 dark:border-stone-800 bg-white dark:bg-stone-900 overflow-hidden shadow-xs">
+        <div className="grid grid-cols-2 lg:grid-cols-4 divide-y sm:divide-y-0 sm:divide-x divide-stone-200/80 dark:divide-stone-800">
+          {/* Icon 1: Best Day */}
+          <div className="p-4 flex items-center gap-3.5">
+            <div className="w-10 h-10 rounded-xl bg-amber-50 dark:bg-amber-950/60 border border-amber-200/70 dark:border-amber-900/60 text-amber-600 dark:text-amber-400 flex items-center justify-center shrink-0">
+              <Trophy className="w-5 h-5" />
+            </div>
+            <div className="min-w-0">
+              <span className="text-[10px] font-bold uppercase tracking-wider text-stone-400 dark:text-stone-500 block">
+                Best Day
+              </span>
+              <div className="text-sm sm:text-base font-bold font-mono text-stone-900 dark:text-stone-100 truncate">
+                {milestoneMetrics.bestDayCount} {milestoneMetrics.bestDayCount === 1 ? 'Task' : 'Tasks'}
+              </div>
+              <span className="text-[11px] text-stone-500 dark:text-stone-400 block truncate">
+                {milestoneMetrics.bestDayLabel}
+              </span>
+            </div>
           </div>
-        </form>
+
+          {/* Icon 2: Best Week */}
+          <div className="p-4 flex items-center gap-3.5">
+            <div className="w-10 h-10 rounded-xl bg-teal-50 dark:bg-teal-950/60 border border-teal-200/70 dark:border-teal-900/60 text-teal-700 dark:text-teal-400 flex items-center justify-center shrink-0">
+              <Award className="w-5 h-5" />
+            </div>
+            <div className="min-w-0">
+              <span className="text-[10px] font-bold uppercase tracking-wider text-stone-400 dark:text-stone-500 block">
+                Best Week
+              </span>
+              <div className="text-sm sm:text-base font-bold font-mono text-stone-900 dark:text-stone-100 truncate">
+                {milestoneMetrics.bestWeekTotal} {milestoneMetrics.bestWeekTotal === 1 ? 'Task' : 'Tasks'}
+              </div>
+              <span className="text-[11px] text-stone-500 dark:text-stone-400 block truncate">
+                Peak 7-day output
+              </span>
+            </div>
+          </div>
+
+          {/* Icon 3: Longest Streak of Completing Minimum 7 Tasks */}
+          <div className="p-4 flex items-center gap-3.5">
+            <div className="w-10 h-10 rounded-xl bg-orange-50 dark:bg-orange-950/60 border border-orange-200/70 dark:border-orange-900/60 text-orange-600 dark:text-orange-400 flex items-center justify-center shrink-0">
+              <Flame className="w-5 h-5" />
+            </div>
+            <div className="min-w-0">
+              <span className="text-[10px] font-bold uppercase tracking-wider text-stone-400 dark:text-stone-500 block">
+                Longest Streak (7+ Tasks)
+              </span>
+              <div className="text-sm sm:text-base font-bold font-mono text-stone-900 dark:text-stone-100 truncate">
+                {milestoneMetrics.longestMin7Streak}{' '}
+                {milestoneMetrics.longestMin7Streak === 1 ? 'Day' : 'Days'}
+              </div>
+              <span className="text-[11px] text-stone-500 dark:text-stone-400 block truncate">
+                Min 7 tasks/day streak
+              </span>
+            </div>
+          </div>
+
+          {/* Icon 4: Minimum 7 Tasks Daily Benchmark */}
+          <div className="p-4 flex items-center gap-3.5">
+            <div className="w-10 h-10 rounded-xl bg-emerald-50 dark:bg-emerald-950/60 border border-emerald-200/70 dark:border-emerald-900/60 text-emerald-600 dark:text-emerald-400 flex items-center justify-center shrink-0">
+              <Zap className="w-5 h-5" />
+            </div>
+            <div className="min-w-0">
+              <span className="text-[10px] font-bold uppercase tracking-wider text-stone-400 dark:text-stone-500 block">
+                Min 7 Tasks Target
+              </span>
+              <div className="text-sm sm:text-base font-bold font-mono text-stone-900 dark:text-stone-100 truncate">
+                {Math.min(todayCompletedCount, 7)} / 7 Today
+              </div>
+              <span className="text-[11px] text-stone-500 dark:text-stone-400 block truncate">
+                {todayCompletedCount >= 7
+                  ? '7+ daily target hit!'
+                  : `${7 - todayCompletedCount} more to hit 7 tasks`}
+              </span>
+            </div>
+          </div>
+        </div>
       </div>
     </div>
   );
