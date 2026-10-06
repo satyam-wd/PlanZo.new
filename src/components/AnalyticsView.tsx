@@ -1,41 +1,28 @@
 // PlanZo Analytics View
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import { useApp } from '../context/AppContext';
 import { MentalBandwidthMeter } from './MentalBandwidthMeter';
 import {
   BarChart2,
   TrendingUp,
-  Smile,
-  Zap,
-  Shield,
-  Lightbulb,
   CheckCircle2,
-  ArrowRight,
-  Clock,
   Heart,
-  Sparkles,
+  CheckSquare,
   Calendar,
-  CalendarDays,
-  Target,
-  Award,
-  BookOpen,
-  Coffee,
-  Check,
-  ChevronRight,
 } from 'lucide-react';
 
 export const AnalyticsView: React.FC = () => {
   const {
-    reflections,
     addReflection,
     todayReflection,
     timetable,
-    bandwidth,
+    scheduledTasks,
     awardXp,
   } = useApp();
 
   // Time scope: Daily, Weekly, or Monthly
   const [timeScope, setTimeScope] = useState<'daily' | 'weekly' | 'monthly'>('weekly');
+  const [hoveredDayIndex, setHoveredDayIndex] = useState<number | null>(null);
 
   // 10-second reflection slider state
   const [energyLevel, setEnergyLevel] = useState(todayReflection?.energyLevel || 4);
@@ -51,44 +38,94 @@ export const AnalyticsView: React.FC = () => {
     awardXp(15, 'Daily Reflection Recorded');
   };
 
-  // Behavioral nudge examples based on B.Tech realities
-  const gentleNudges = [
-    {
-      title: 'Post-Lab Energy Slump Detected',
-      insight: 'Your attention tends to dip sharply between 3:00 PM and 4:30 PM on days with 3-hour labs.',
-      actionText: 'Auto-scheduled a 25-minute Chill Block after lab instead of heavy theory',
-      applied: true,
-    },
-    {
-      title: 'Thursday Habit Realignment',
-      insight: 'You usually skip your gym session on Thursdays due to Operating Systems lab assignments.',
-      actionText: 'Moved Thursday fitness habit to Saturday morning (a lighter day)',
-      applied: true,
-    },
-    {
-      title: 'Golden Focus Window',
-      insight: 'Your highest uninterrupted focus occurs between 8:00 AM – 9:00 AM (pre-lecture hours).',
-      actionText: 'Reserved this slot for daily LeetCode/DSA problem solving (92% completion)',
-      applied: true,
-    },
-    {
-      title: 'Evening Theory Retention Boost',
-      insight: 'Cognitive load drops after 9:30 PM. Switching from writing code to watching 1.5x NPTEL videos.',
-      actionText: 'Shifted high-math algorithms to early evening and theory to late night',
-      applied: true,
-    },
+  // Compute Past 7 Days Task Completion Data
+  const past7DaysTaskData = useMemo(() => {
+    const days: {
+      dateStr: string;
+      dayShort: string;
+      dateLabel: string;
+      completedTasks: number;
+      totalTasks: number;
+      isToday: boolean;
+    }[] = [];
+
+    const now = new Date();
+    const todayStr = now.toISOString().split('T')[0];
+
+    for (let i = 6; i >= 0; i--) {
+      const d = new Date(now);
+      d.setDate(now.getDate() - i);
+      const dateStr = d.toISOString().split('T')[0];
+      const dayShort = d.toLocaleDateString('en-US', { weekday: 'short' });
+      const dateLabel = d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+      const isToday = dateStr === todayStr;
+
+      if (isToday) {
+        const completedFromTimetable = timetable.filter((t) => t.completed).length;
+        const totalFromTimetable = timetable.length;
+        const scheduledForToday = scheduledTasks[dateStr] || [];
+        const completedFromScheduled = scheduledForToday.filter((t) => t.completed).length;
+        const completedTasks = Math.max(completedFromTimetable, completedFromScheduled);
+        const totalTasks = Math.max(totalFromTimetable, scheduledForToday.length, completedTasks);
+
+        days.push({
+          dateStr,
+          dayShort,
+          dateLabel,
+          completedTasks,
+          totalTasks,
+          isToday: true,
+        });
+      } else {
+        const tasksForDay = scheduledTasks[dateStr] || [];
+        const completedTasks = tasksForDay.filter((t) => t.completed).length;
+        const totalTasks = tasksForDay.length;
+
+        days.push({
+          dateStr,
+          dayShort,
+          dateLabel,
+          completedTasks,
+          totalTasks,
+          isToday: false,
+        });
+      }
+    }
+
+    return days;
+  }, [timetable, scheduledTasks]);
+
+  const totalWeeklyTasksDone = past7DaysTaskData.reduce((sum, d) => sum + d.completedTasks, 0);
+  const averageDailyTasksDone = (totalWeeklyTasksDone / 7).toFixed(1);
+  const peakTaskDay = useMemo(() => {
+    return past7DaysTaskData.reduce(
+      (best, cur) => (cur.completedTasks >= best.completedTasks ? cur : best),
+      past7DaysTaskData[0]
+    );
+  }, [past7DaysTaskData]);
+
+  // Dynamic Y-axis scale for the 7-day tasks completed graph
+  const yAxisMax = useMemo(() => {
+    const maxCompleted = Math.max(...past7DaysTaskData.map((d) => d.completedTasks), 0);
+    const maxTotal = Math.max(...past7DaysTaskData.map((d) => d.totalTasks), 0);
+    const referenceMax = Math.max(maxCompleted, Math.min(maxTotal, 10), 6);
+    // Round up to a clean even number for 4 horizontal grid steps
+    return Math.ceil(referenceMax / 2) * 2;
+  }, [past7DaysTaskData]);
+
+  const yAxisTicks = [
+    yAxisMax,
+    Math.round(yAxisMax * 0.75),
+    Math.round(yAxisMax * 0.5),
+    Math.round(yAxisMax * 0.25),
+    0,
   ];
 
-  // Weekly data (past 7 days)
-  const weeklyData = [
-    { day: 'Mon', adherence: 85, focusHours: 4.5, habits: 3 },
-    { day: 'Tue', adherence: 78, focusHours: 3.8, habits: 2 },
-    { day: 'Wed', adherence: 92, focusHours: 5.2, habits: 4 },
-    { day: 'Thu', adherence: 68, focusHours: 3.0, habits: 1 },
-    { day: 'Fri', adherence: 88, focusHours: 4.8, habits: 3 },
-    { day: 'Sat', adherence: 94, focusHours: 6.0, habits: 4 },
-    { day: 'Sun', adherence: 82, focusHours: 4.0, habits: 3 },
-  ];
+  // Today's live stats for Daily view
+  const todayCompletedCount = timetable.filter((t) => t.completed).length;
+  const todayTotalCount = timetable.length;
+  const todayAdherenceRate =
+    todayTotalCount > 0 ? Math.round((todayCompletedCount / todayTotalCount) * 1000) / 10 : 0;
 
   // Monthly stats
   const monthlyStats = {
@@ -102,16 +139,15 @@ export const AnalyticsView: React.FC = () => {
 
   return (
     <div className="space-y-6">
-      
       {/* 1. Header with Time Scope Selector */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 p-5 rounded-3xl bg-white dark:bg-stone-900 border border-stone-200 dark:border-stone-800 shadow-xs">
         <div>
           <h2 className="text-base sm:text-lg font-bold text-stone-900 dark:text-stone-100 flex items-center gap-2">
             <BarChart2 className="w-5 h-5 text-teal-700 dark:text-teal-400" />
-            <span>Behavioral Analytics & Schedule Intelligence</span>
+            <span>Behavioral Analytics & Task Progress</span>
           </h2>
           <p className="text-xs text-stone-500 dark:text-stone-400 mt-0.5">
-            Tracks schedule adherence, fatigue rhythms, and automatically tunes future timetables based on real habits.
+            Track your daily completed tasks, focus consistency, and cognitive bandwidth across the semester.
           </p>
         </div>
 
@@ -119,7 +155,7 @@ export const AnalyticsView: React.FC = () => {
         <div className="flex items-center p-1 rounded-2xl bg-stone-100 dark:bg-stone-800 border border-stone-200 dark:border-stone-750 shrink-0">
           <button
             onClick={() => setTimeScope('daily')}
-            className={`px-3 py-1.5 rounded-xl text-xs font-semibold transition-all ${
+            className={`px-3 py-1.5 rounded-xl text-xs font-semibold transition-all cursor-pointer ${
               timeScope === 'daily'
                 ? 'bg-white dark:bg-stone-700 text-stone-900 dark:text-stone-100 shadow-xs'
                 : 'text-stone-500 dark:text-stone-400 hover:text-stone-800'
@@ -129,7 +165,7 @@ export const AnalyticsView: React.FC = () => {
           </button>
           <button
             onClick={() => setTimeScope('weekly')}
-            className={`px-3 py-1.5 rounded-xl text-xs font-semibold transition-all ${
+            className={`px-3 py-1.5 rounded-xl text-xs font-semibold transition-all cursor-pointer ${
               timeScope === 'weekly'
                 ? 'bg-white dark:bg-stone-700 text-stone-900 dark:text-stone-100 shadow-xs'
                 : 'text-stone-500 dark:text-stone-400 hover:text-stone-800'
@@ -139,7 +175,7 @@ export const AnalyticsView: React.FC = () => {
           </button>
           <button
             onClick={() => setTimeScope('monthly')}
-            className={`px-3 py-1.5 rounded-xl text-xs font-semibold transition-all ${
+            className={`px-3 py-1.5 rounded-xl text-xs font-semibold transition-all cursor-pointer ${
               timeScope === 'monthly'
                 ? 'bg-white dark:bg-stone-700 text-stone-900 dark:text-stone-100 shadow-xs'
                 : 'text-stone-500 dark:text-stone-400 hover:text-stone-800'
@@ -162,12 +198,14 @@ export const AnalyticsView: React.FC = () => {
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
             <div className="p-4 rounded-2xl border border-stone-200 dark:border-stone-800 bg-white dark:bg-stone-900 shadow-xs">
               <span className="text-[11px] font-semibold uppercase tracking-wider text-stone-400">
-                Today's Adherence Rate
+                Tasks Completed Today
               </span>
               <div className="text-2xl font-bold font-mono text-teal-700 dark:text-teal-400 mt-1">
-                87.5%
+                {todayCompletedCount} / {todayTotalCount}
               </div>
-              <p className="text-xs text-stone-500 mt-1">7 of 8 planned activities completed on time</p>
+              <p className="text-xs text-stone-500 mt-1">
+                {todayAdherenceRate}% of today&apos;s scheduled tasks finished
+              </p>
             </div>
 
             <div className="p-4 rounded-2xl border border-stone-200 dark:border-stone-800 bg-white dark:bg-stone-900 shadow-xs">
@@ -177,7 +215,7 @@ export const AnalyticsView: React.FC = () => {
               <div className="text-2xl font-bold font-mono text-stone-900 dark:text-stone-100 mt-1">
                 4 hrs 15 mins
               </div>
-              <p className="text-xs text-stone-500 mt-1">DSA Sprint + OS Virtual Memory revision</p>
+              <p className="text-xs text-stone-500 mt-1">DSA Sprint + Core Subject revision</p>
             </div>
 
             <div className="p-4 rounded-2xl border border-stone-200 dark:border-stone-800 bg-white dark:bg-stone-900 shadow-xs">
@@ -187,58 +225,210 @@ export const AnalyticsView: React.FC = () => {
               <div className="text-2xl font-bold font-mono text-amber-600 dark:text-amber-400 mt-1">
                 45 mins
               </div>
-              <p className="text-xs text-stone-500 mt-1">2 restorative chill blocks injected</p>
+              <p className="text-xs text-stone-500 mt-1">Restorative chill blocks active</p>
             </div>
           </div>
         </div>
       )}
 
-      {/* WEEKLY VIEW */}
+      {/* WEEKLY VIEW: Proper Graph Showing Tasks Completed Per Day */}
       {timeScope === 'weekly' && (
         <div className="space-y-6 animate-fadeIn">
-          {/* 7-Day Adherence & Focus Bar Chart */}
-          <div className="rounded-3xl border border-stone-200 dark:border-stone-800 bg-white dark:bg-stone-900 p-5 sm:p-6 shadow-xs space-y-4">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-2">
-                <TrendingUp className="w-4 h-4 text-teal-700 dark:text-teal-400" />
-                <h3 className="text-xs font-bold uppercase tracking-wider text-stone-900 dark:text-stone-100">
-                  Past 7 Days Schedule Adherence Rhythm
-                </h3>
+          <div className="rounded-3xl border border-stone-200 dark:border-stone-800 bg-white dark:bg-stone-900 p-5 sm:p-6 shadow-xs space-y-5">
+            {/* Graph Header */}
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+              <div>
+                <div className="flex items-center gap-2">
+                  <TrendingUp className="w-4 h-4 text-teal-700 dark:text-teal-400" />
+                  <h3 className="text-xs sm:text-sm font-bold uppercase tracking-wider text-stone-900 dark:text-stone-100">
+                    Past 7 Days Task Completion Graph
+                  </h3>
+                </div>
+                <p className="text-xs text-stone-500 dark:text-stone-400 mt-0.5">
+                  Number of tasks completed on each particular day over the last 7 days
+                </p>
               </div>
-              <span className="text-xs font-mono text-stone-400">Average: 84.8% Adherence</span>
-            </div>
 
-            {/* Visual Bar Graph */}
-            <div className="grid grid-cols-7 gap-3 pt-3">
-              {weeklyData.map((item, idx) => (
-                <div key={item.day} className="flex flex-col items-center gap-2">
-                  <span className="text-[11px] font-mono font-bold text-stone-600 dark:text-stone-300">
-                    {item.adherence}%
-                  </span>
-                  <div className="w-full bg-stone-100 dark:bg-stone-800 h-32 rounded-2xl flex items-end p-1.5 overflow-hidden">
-                    <div
-                      className={`w-full rounded-xl transition-all duration-700 ${
-                        idx === 6
-                          ? 'bg-gradient-to-t from-teal-700 to-emerald-500'
-                          : 'bg-stone-300 dark:bg-stone-700 hover:bg-teal-600'
-                      }`}
-                      style={{ height: `${item.adherence}%` }}
-                    />
-                  </div>
-                  <span className={`text-xs ${idx === 6 ? 'font-bold text-teal-700 dark:text-teal-400' : 'text-stone-400'}`}>
-                    {item.day}
-                  </span>
-                  <span className="text-[10px] text-stone-400 font-mono">
-                    {item.focusHours}h focus
+              <div className="flex items-center gap-3 self-start sm:self-auto">
+                <div className="px-3 py-1.5 rounded-xl bg-teal-50 dark:bg-teal-950/50 border border-teal-200/70 dark:border-teal-900/70 flex items-center gap-2">
+                  <CheckSquare className="w-3.5 h-3.5 text-teal-700 dark:text-teal-400" />
+                  <span className="text-xs font-mono font-bold text-teal-800 dark:text-teal-300">
+                    {totalWeeklyTasksDone} Tasks Done
                   </span>
                 </div>
-              ))}
+                <span className="text-xs font-mono text-stone-400">
+                  Avg: {averageDailyTasksDone}/day
+                </span>
+              </div>
             </div>
 
+            {/* Proper Cartesian Coordinate Graph (Y-Axis + Gridlines + SVG Trend Curve + Bars + X-Axis) */}
+            <div className="pt-2">
+              <div className="flex gap-3">
+                {/* Y-Axis Labels (Task Count) */}
+                <div className="flex flex-col justify-between h-56 pb-11 text-[11px] font-mono text-stone-400 dark:text-stone-500 select-none text-right pr-1 w-9 shrink-0">
+                  {yAxisTicks.map((tick, idx) => (
+                    <span key={idx} className="leading-none">
+                      {tick}
+                    </span>
+                  ))}
+                </div>
+
+                {/* Plot Canvas */}
+                <div className="relative flex-1 h-56 flex flex-col">
+                  {/* Plot Area with Horizontal Gridlines */}
+                  <div className="relative flex-1 border-l border-b border-stone-200 dark:border-stone-800">
+                    {/* Horizontal Reference Grid Lines */}
+                    <div className="absolute inset-0 flex flex-col justify-between pointer-events-none">
+                      {yAxisTicks.map((_, idx) => (
+                        <div
+                          key={idx}
+                          className={`w-full border-t ${
+                            idx === yAxisTicks.length - 1
+                              ? 'border-transparent'
+                              : 'border-dashed border-stone-200/80 dark:border-stone-800/80'
+                          }`}
+                        />
+                      ))}
+                    </div>
+
+                    {/* SVG Area & Line Overlay Connecting Daily Task Counts */}
+                    <svg
+                      viewBox="0 0 700 200"
+                      preserveAspectRatio="none"
+                      className="absolute inset-0 w-full h-full overflow-visible pointer-events-none z-10"
+                    >
+                      <defs>
+                        <linearGradient id="taskAreaGrad" x1="0" y1="0" x2="0" y2="1">
+                          <stop offset="0%" stopColor="#0f766e" stopOpacity="0.22" />
+                          <stop offset="100%" stopColor="#0f766e" stopOpacity="0.0" />
+                        </linearGradient>
+                      </defs>
+
+                      {(() => {
+                        const points = past7DaysTaskData.map((d, idx) => {
+                          const x = idx * 100 + 50;
+                          const ratio = Math.min(1, d.completedTasks / Math.max(1, yAxisMax));
+                          const y = 200 - ratio * 184 - 8;
+                          return { x, y, ...d };
+                        });
+
+                        const polylinePoints = points.map((p) => `${p.x},${p.y}`).join(' ');
+                        const areaPoints = `50,200 ${polylinePoints} 650,200`;
+
+                        return (
+                          <>
+                            <polygon points={areaPoints} fill="url(#taskAreaGrad)" />
+                            <polyline
+                              fill="none"
+                              stroke="#14b8a6"
+                              strokeWidth="2.5"
+                              strokeLinecap="round"
+                              strokeLinejoin="round"
+                              points={polylinePoints}
+                            />
+                          </>
+                        );
+                      })()}
+                    </svg>
+
+                    {/* 7 Daily Columns with Bars & Data Points */}
+                    <div className="relative z-20 grid grid-cols-7 h-full items-end">
+                      {past7DaysTaskData.map((item, idx) => {
+                        const heightPct = Math.min(
+                          100,
+                          Math.round((item.completedTasks / Math.max(1, yAxisMax)) * 92)
+                        );
+                        const isHovered = hoveredDayIndex === idx;
+
+                        return (
+                          <div
+                            key={item.dateStr}
+                            onMouseEnter={() => setHoveredDayIndex(idx)}
+                            onMouseLeave={() => setHoveredDayIndex(null)}
+                            className="relative h-full flex flex-col items-center justify-end px-1.5 sm:px-3 group cursor-pointer"
+                          >
+                            {/* Floating Tooltip / Pill showing exact task count */}
+                            <div
+                              className={`mb-1.5 px-2 py-0.5 rounded-lg text-[11px] font-mono font-bold transition-all ${
+                                item.isToday || isHovered
+                                  ? 'bg-teal-700 text-white shadow-xs scale-105'
+                                  : item.completedTasks > 0
+                                  ? 'bg-stone-100 dark:bg-stone-800 text-stone-700 dark:text-stone-200'
+                                  : 'text-stone-400 dark:text-stone-500'
+                              }`}
+                            >
+                              {item.completedTasks} {item.completedTasks === 1 ? 'task' : 'tasks'}
+                            </div>
+
+                            {/* Vertical Bar */}
+                            <div className="w-full max-w-[42px] h-[82%] flex items-end justify-center">
+                              <div
+                                className={`w-full rounded-t-xl transition-all duration-500 relative ${
+                                  item.isToday
+                                    ? 'bg-gradient-to-t from-teal-700 to-emerald-500 shadow-sm'
+                                    : item.completedTasks > 0
+                                    ? 'bg-teal-600/75 dark:bg-teal-500/70 group-hover:bg-teal-600'
+                                    : 'bg-stone-200 dark:bg-stone-800'
+                                }`}
+                                style={{
+                                  height: item.completedTasks > 0 ? `${Math.max(heightPct, 10)}%` : '4px',
+                                }}
+                              />
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+
+                  {/* X-Axis Labels (Day Name & Date) */}
+                  <div className="grid grid-cols-7 pt-2.5 h-11">
+                    {past7DaysTaskData.map((item) => (
+                      <div key={item.dateStr} className="flex flex-col items-center text-center">
+                        <span
+                          className={`text-xs leading-tight ${
+                            item.isToday
+                              ? 'font-bold text-teal-700 dark:text-teal-400'
+                              : 'font-medium text-stone-600 dark:text-stone-300'
+                          }`}
+                        >
+                          {item.isToday ? 'Today' : item.dayShort}
+                        </span>
+                        <span className="text-[10px] font-mono text-stone-400 dark:text-stone-500">
+                          {item.dateLabel}
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* Graph Summary Footer */}
             <div className="pt-3 border-t border-stone-100 dark:border-stone-800 flex flex-wrap items-center justify-between gap-3 text-xs text-stone-500 dark:text-stone-400">
-              <span>Peak Focus Day: <strong>Saturday (6.0 hrs)</strong></span>
-              <span>Lowest Stress Window: <strong>Morning 8:00 AM – 10:00 AM</strong></span>
-              <span>Zero-guilt auto-recalibrations: <strong className="text-teal-700 dark:text-teal-400">4 times</strong></span>
+              <span className="flex items-center gap-1.5">
+                <Calendar className="w-3.5 h-3.5 text-teal-700 dark:text-teal-400" />
+                <span>
+                  Today&apos;s Progress:{' '}
+                  <strong className="text-stone-900 dark:text-stone-100">
+                    {todayCompletedCount} of {todayTotalCount} tasks done
+                  </strong>
+                </span>
+              </span>
+              <span>
+                Most Productive Day:{' '}
+                <strong className="text-stone-900 dark:text-stone-100">
+                  {peakTaskDay.isToday ? 'Today' : `${peakTaskDay.dayShort} (${peakTaskDay.dateLabel})`} —{' '}
+                  {peakTaskDay.completedTasks} {peakTaskDay.completedTasks === 1 ? 'task' : 'tasks'}
+                </strong>
+              </span>
+              <span>
+                7-Day Total:{' '}
+                <strong className="text-teal-700 dark:text-teal-400">
+                  {totalWeeklyTasksDone} tasks completed
+                </strong>
+              </span>
             </div>
           </div>
         </div>
@@ -329,54 +519,7 @@ export const AnalyticsView: React.FC = () => {
         </div>
       )}
 
-      {/* 4. SCHEDULE ENHANCEMENT ENGINE (Checklist item 2.5: AI Adjusts Future Schedules) */}
-      <div className="rounded-3xl border border-teal-200/80 dark:border-teal-900/60 bg-gradient-to-br from-teal-50/70 via-white to-stone-50/50 dark:from-teal-950/30 dark:via-stone-900 dark:to-stone-950/40 p-5 sm:p-6 shadow-xs space-y-4">
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-2">
-            <Sparkles className="w-4 h-4 text-teal-700 dark:text-teal-400" />
-            <h3 className="text-xs font-bold uppercase tracking-wider text-stone-900 dark:text-stone-100">
-              Schedule Enhancement Engine: Behavioral Adaptations Applied
-            </h3>
-          </div>
-          <span className="px-2 py-0.5 rounded-full text-[10px] font-semibold bg-emerald-100 text-emerald-800 dark:bg-emerald-950 dark:text-emerald-300">
-            Active Optimizer
-          </span>
-        </div>
-
-        <p className="text-xs text-stone-600 dark:text-stone-300 leading-relaxed">
-          The app continuously analyzes your task completion patterns and energy reflection logs. Instead of rigid schedules that break, future days adapt automatically:
-        </p>
-
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pt-1">
-          {gentleNudges.map((nudge, index) => (
-            <div
-              key={index}
-              className="rounded-2xl border border-stone-200 dark:border-stone-800 bg-white dark:bg-stone-850 p-4 shadow-2xs space-y-2 flex flex-col justify-between"
-            >
-              <div>
-                <div className="flex items-center justify-between">
-                  <h4 className="text-xs font-bold text-stone-900 dark:text-stone-100">
-                    {nudge.title}
-                  </h4>
-                  <span className="text-[10px] font-mono text-teal-700 dark:text-teal-400 font-semibold">
-                    Rule #{index + 1}
-                  </span>
-                </div>
-                <p className="mt-1 text-xs text-stone-500 dark:text-stone-400 leading-relaxed">
-                  {nudge.insight}
-                </p>
-              </div>
-
-              <div className="pt-2 border-t border-stone-100 dark:border-stone-800 text-[11px] text-teal-800 dark:text-teal-300 font-medium flex items-center gap-1.5">
-                <CheckCircle2 className="w-3.5 h-3.5 text-teal-600 dark:text-teal-400 shrink-0" />
-                <span className="leading-tight">{nudge.actionText}</span>
-              </div>
-            </div>
-          ))}
-        </div>
-      </div>
-
-      {/* 5. 10-Second Daily Cognitive Reflection Form */}
+      {/* 4. 10-Second Daily Cognitive Reflection Form */}
       <div className="rounded-3xl border border-stone-200/90 dark:border-stone-800 bg-white dark:bg-stone-900 p-5 sm:p-6 shadow-xs">
         <div className="flex items-center justify-between mb-2">
           <div className="flex items-center gap-2">
@@ -394,12 +537,11 @@ export const AnalyticsView: React.FC = () => {
         </div>
 
         <p className="text-xs text-stone-500 dark:text-stone-400 mb-4">
-          A quick slider check-in feeds directly into your Mental Bandwidth Engine so tomorrow's schedule auto-adjusts to your fatigue levels without guilt.
+          A quick slider check-in feeds directly into your Mental Bandwidth Engine so tomorrow&apos;s schedule auto-adjusts to your fatigue levels without guilt.
         </p>
 
         <form onSubmit={handleSaveReflection} className="space-y-4">
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-            
             {/* Energy Slider */}
             <div className="p-3.5 rounded-2xl bg-stone-50 dark:bg-stone-800/60 border border-stone-100 dark:border-stone-800 space-y-2">
               <div className="flex items-center justify-between text-xs">
@@ -468,7 +610,6 @@ export const AnalyticsView: React.FC = () => {
                 <span>Exam Overload</span>
               </div>
             </div>
-
           </div>
 
           {/* Quick optional note */}
@@ -485,14 +626,13 @@ export const AnalyticsView: React.FC = () => {
             />
             <button
               type="submit"
-              className="w-full sm:w-auto px-5 py-2.5 rounded-2xl bg-teal-700 text-white hover:bg-teal-800 text-xs font-semibold shrink-0 transition-colors shadow-xs"
+              className="w-full sm:w-auto px-5 py-2.5 rounded-2xl bg-teal-700 text-white hover:bg-teal-800 text-xs font-semibold shrink-0 transition-colors shadow-xs cursor-pointer"
             >
               {submitted ? 'Update Reflection' : 'Save & Balance Tomorrow'}
             </button>
           </div>
         </form>
       </div>
-
     </div>
   );
 };

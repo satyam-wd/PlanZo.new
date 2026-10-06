@@ -501,8 +501,9 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   };
 
   const toggleItemComplete = (id: string) => {
-    setTimetable((prev) =>
-      prev.map((item) => {
+    const todayStr = new Date().toISOString().split('T')[0];
+    setTimetable((prev) => {
+      const updated = prev.map((item) => {
         if (item.id === id) {
           const next = !item.completed;
           if (next) {
@@ -512,8 +513,23 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
           return { ...item, completed: next };
         }
         return item;
-      })
-    );
+      });
+      setScheduledTasks((prevScheduled) => ({
+        ...prevScheduled,
+        [todayStr]: updated.map((item) => ({
+          id: item.id,
+          title: item.title,
+          category: item.category,
+          startTime: item.startTime,
+          endTime: item.endTime,
+          date: todayStr,
+          completed: item.completed,
+          cognitiveWeight: item.cognitiveWeight || 3,
+          subjectId: item.subjectId,
+        })),
+      }));
+      return updated;
+    });
   };
 
   const snoozeItem = (id: string, minutes: number = 30) => {
