@@ -26,7 +26,10 @@ import {
   getCurriculumForSatiSemester,
 } from '../data/satiVidishaData';
 import { getBranchSemesterSubjects } from '../data/branchCurriculumData';
-import { FOUNDATION_ENGINEERING_SUBJECTS } from '../data/foundationSubjects';
+import {
+  FOUNDATION_ENGINEERING_SUBJECTS,
+  getFoundationSemesterSubjects,
+} from '../data/foundationSubjects';
 import {
   FIRST_YEAR_SUBJECT_NOTES_CATALOG,
   generateSubjectFolderDataFromCatalog,
@@ -324,7 +327,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     if (saved) {
       try { return JSON.parse(saved); } catch (e) {}
     }
-    return FOUNDATION_ENGINEERING_SUBJECTS;
+    return getFoundationSemesterSubjects(1);
   });
 
   // 4. Daily Reflections State (Starts clean for new user)

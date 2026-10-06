@@ -31,7 +31,12 @@ import {
   SATI_SUBJECT_FOLDERS_DATA,
   getCurriculumForSatiSemester,
 } from '../data/satiVidishaData';
-import { FOUNDATION_ENGINEERING_SUBJECTS } from '../data/foundationSubjects';
+import {
+  FOUNDATION_ENGINEERING_SUBJECTS,
+  SEM_1_FOUNDATION_SUBJECTS,
+  SEM_2_FOUNDATION_SUBJECTS,
+  getFoundationSemesterSubjects,
+} from '../data/foundationSubjects';
 import {
   getBranchSemesterSubjects,
   getBranchSecondYearSubjects,
@@ -237,15 +242,8 @@ export const PersonalizationSetupWizard: React.FC<PersonalizationSetupWizardProp
   // Step 2: Subject Options Selection
   const [selectedSubjectIds, setSelectedSubjectIds] = useState<string[]>(() => {
     const sem = profile.semester || 1;
-    const isFound = sem <= 2;
-    if (isFound) {
-      return [
-        'sub-applied-chem',
-        'sub-applied-phys',
-        'sub-maths',
-        'sub-eng-comm',
-        'sub-basic-cs',
-      ];
+    if (sem === 1 || sem === 2) {
+      return getFoundationSemesterSubjects(sem).map((s) => s.id);
     }
     const branchSubs = getBranchSemesterSubjects(
       profile.branch || 'Computer Science & Engineering (CSE)',
@@ -260,9 +258,9 @@ export const PersonalizationSetupWizard: React.FC<PersonalizationSetupWizardProp
   const [subjectSelectionError, setSubjectSelectionError] = useState<string | null>(null);
   const [mostImportantTask, setMostImportantTask] = useState<string>(() => {
     const sem = profile.semester || 1;
-    const isFound = sem <= 2;
-    if (isFound) {
-      return profile.mostImportantTask || 'Basic Computer Science & C Programming';
+    if (sem === 1 || sem === 2) {
+      const semSubs = getFoundationSemesterSubjects(sem);
+      return profile.mostImportantTask || semSubs[0]?.name || 'Applied Chemistry';
     }
     const branchSubs = getBranchSemesterSubjects(
       profile.branch || 'Computer Science & Engineering (CSE)',
@@ -293,25 +291,12 @@ export const PersonalizationSetupWizard: React.FC<PersonalizationSetupWizardProp
 
   const handleSelectStandardGroupA = () => {
     setSubjectSelectionError(null);
-    setSelectedSubjectIds([
-      'sub-applied-phys',
-      'sub-maths',
-      'sub-basic-elec',
-      'sub-basic-cs',
-      'sub-eng-comm',
-    ]);
+    setSelectedSubjectIds(SEM_1_FOUNDATION_SUBJECTS.map((s) => s.id));
   };
 
   const handleSelectStandardGroupB = () => {
     setSubjectSelectionError(null);
-    setSelectedSubjectIds([
-      'sub-applied-chem',
-      'sub-maths',
-      'sub-basic-electr',
-      'sub-eng-graphics',
-      'sub-fund-mech',
-      'sub-fund-civil',
-    ]);
+    setSelectedSubjectIds(SEM_2_FOUNDATION_SUBJECTS.map((s) => s.id));
   };
 
   const handleSelectSem3Subjects = () => {
@@ -401,14 +386,11 @@ export const PersonalizationSetupWizard: React.FC<PersonalizationSetupWizardProp
     setSemester(newSem);
     setSubjectSelectionError(null);
     if (newSem === 1 || newSem === 2) {
-      setSelectedSubjectIds([
-        'sub-applied-chem',
-        'sub-applied-phys',
-        'sub-maths',
-        'sub-eng-comm',
-        'sub-basic-cs',
-      ]);
-      setMostImportantTask('Basic Computer Science & C Programming');
+      const semSubs = getFoundationSemesterSubjects(newSem);
+      setSelectedSubjectIds(semSubs.map((s) => s.id));
+      if (semSubs.length > 0) {
+        setMostImportantTask(semSubs[0].name);
+      }
     } else if (newSem === 3 || newSem === 4) {
       const semSubs = getBranchSemesterSubjects(resolvedBranch, newSem);
       setSelectedSubjectIds(semSubs.map((s) => s.id));
@@ -1262,17 +1244,17 @@ export const PersonalizationSetupWizard: React.FC<PersonalizationSetupWizardProp
                       type="button"
                       onClick={handleSelectStandardGroupA}
                       className="px-2.5 py-1 rounded-lg text-[11px] font-semibold bg-stone-100 dark:bg-stone-800 hover:bg-teal-50 dark:hover:bg-teal-950/60 hover:text-teal-700 dark:hover:text-teal-300 text-stone-700 dark:text-stone-300 border border-stone-200 dark:border-stone-700 transition-colors cursor-pointer"
-                      title="Physics, Maths, Electrical, CS, English"
+                      title="Semester 1 Subjects"
                     >
-                      Group A (5)
+                      Sem 1 ({SEM_1_FOUNDATION_SUBJECTS.length})
                     </button>
                     <button
                       type="button"
                       onClick={handleSelectStandardGroupB}
                       className="px-2.5 py-1 rounded-lg text-[11px] font-semibold bg-stone-100 dark:bg-stone-800 hover:bg-teal-50 dark:hover:bg-teal-950/60 hover:text-teal-700 dark:hover:text-teal-300 text-stone-700 dark:text-stone-300 border border-stone-200 dark:border-stone-700 transition-colors cursor-pointer"
-                      title="Chemistry, Maths, Electronics, Drawing, Mech, Civil"
+                      title="Semester 2 Subjects"
                     >
-                      Group B (6)
+                      Sem 2 ({SEM_2_FOUNDATION_SUBJECTS.length})
                     </button>
                   </>
                 ) : isSecondYear ? (

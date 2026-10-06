@@ -1,4 +1,5 @@
 import { SubjectCourse } from '../types';
+import { getFoundationSemesterSubjects } from './foundationSubjects';
 import { THIRD_YEAR_BRANCH_CURRICULUM } from './thirdYearCurriculumData';
 import { FOURTH_YEAR_BRANCH_CURRICULUM } from './fourthYearCurriculumData';
 
@@ -1601,6 +1602,9 @@ export function getBranchSemesterSubjects(branchName: string, semester: number):
     return FOURTH_YEAR_BRANCH_CURRICULUM.cse[semester as 7 | 8] || [];
   }
 
-  // Semester 1 & 2 fallback
+  // Semester 1 & 2 return the exact Sem 1 / Sem 2 subjects
+  if (semester === 1 || semester === 2) {
+    return getFoundationSemesterSubjects(semester);
+  }
   return [];
 }
