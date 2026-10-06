@@ -723,18 +723,27 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const recalibrateSchedule = async (missedItemTitle?: string) => {
     setIsRecalibrating(true);
     try {
-      const envBase = (import.meta as any).env?.VITE_API_BASE_URL;
-      const base = envBase && typeof envBase === 'string' && envBase.trim() ? envBase.trim().replace(/\/+$/, '') : '';
-      const response = await fetch(`${base}/api/recalibrate`, {
+      const { resolveDynamicApiUrl, logSarthiConnectivityEvent } = await import('../services/sarthiChatService');
+      const recalibrateUrl = resolveDynamicApiUrl('/api/recalibrate');
+      const response = await fetch(recalibrateUrl, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
         body: JSON.stringify({
           items: timetable.filter((t) => !t.completed),
           missedItemTitle: missedItemTitle || 'Missed Study Slot',
           reason: 'Auto-adjustment triggered to balance student cognitive load',
         }),
       });
-      const data = await response.json();
+      const contentType = response.headers.get('content-type') || '';
+      if (!response.ok || !contentType.includes('application/json')) {
+        logSarthiConnectivityEvent({
+          stage: 'endpoint_attempt',
+          endpoint: recalibrateUrl,
+          status: response.status,
+          message: `Recalibrate endpoint returned ${response.status}; using local schedule rebalance fallback.`,
+        });
+      }
+      const data = response.ok && contentType.includes('application/json') ? await response.json() : {};
 
       setTimetable((prev) => {
         let hasBuffer = prev.some((i) => i.category === 'chill' && i.title.includes('Chai'));
