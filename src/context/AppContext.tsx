@@ -11,6 +11,8 @@ import {
   DailyScheduledTask,
   ItemCategory,
   AuthUser,
+  ProjectItem,
+  CalendarEventItem,
 } from '../types';
 import {
   CURRICULUM_DATA,
@@ -43,6 +45,19 @@ export interface BunkCalculation {
   statusLabel: string;
 }
 
+export type AppViewType =
+  | 'home'
+  | 'timeline'
+  | 'tasks'
+  | 'schedule'
+  | 'projects'
+  | 'profile'
+  | 'attendance'
+  | 'academic'
+  | 'analytics'
+  | 'ai'
+  | 'settings';
+
 interface AppContextType {
   profile: StudentProfile;
   updateProfile: (updates: Partial<StudentProfile>) => void;
@@ -67,8 +82,9 @@ interface AppContextType {
   setZenModeOpen: (open: boolean) => void;
   activeZenTask: TimetableItem | null;
   startZenMode: (item?: TimetableItem) => void;
-  activeView: 'home' | 'timeline' | 'tasks' | 'schedule' | 'attendance' | 'academic' | 'analytics' | 'ai' | 'settings';
-  setActiveView: (view: 'home' | 'timeline' | 'tasks' | 'schedule' | 'attendance' | 'academic' | 'analytics' | 'ai' | 'settings') => void;
+  activeView: AppViewType;
+  setActiveView: (view: AppViewType) => void;
+  navigateToPath: (path: string, replace?: boolean) => void;
   isAiDrawerOpen: boolean;
   setIsAiDrawerOpen: (open: boolean) => void;
   isAttendanceModalOpen: boolean;
@@ -96,6 +112,14 @@ interface AppContextType {
   toggleTaskForDate: (date: string, taskId: string) => void;
   deleteTaskForDate: (date: string, taskId: string) => void;
   getDateTaskStats: (dateStr: string) => { total: number; completed: number; percentage: number };
+  // Projects & Calendar Events (User-Isolated)
+  projects: ProjectItem[];
+  addProject: (project: Omit<ProjectItem, 'id' | 'userId' | 'createdAt'>) => void;
+  updateProject: (id: string, updates: Partial<ProjectItem>) => void;
+  deleteProject: (id: string) => void;
+  calendarEvents: CalendarEventItem[];
+  addCalendarEvent: (event: Omit<CalendarEventItem, 'id' | 'userId' | 'createdAt'>) => void;
+  deleteCalendarEvent: (id: string) => void;
   // XP & Day Streak Feature
   userXp: number;
   userStreak: number;
@@ -115,8 +139,11 @@ interface AppContextType {
     semester?: number;
     rollNo?: string;
     avatarUrl?: string;
-  }) => void;
+  }) => { ok: boolean; error?: string; user?: AuthUser };
   signIn: (identifier: string, password?: string) => boolean;
+  authenticateWithCredentials: (email: string, password: string) => Promise<{ ok: boolean; error?: string; user?: AuthUser }>;
+  registerAccount: (fullName: string, email: string, password: string) => Promise<{ ok: boolean; error?: string; user?: AuthUser }>;
+  requestPasswordReset: (email: string, newPassword?: string) => Promise<{ ok: boolean; step?: string; message?: string; error?: string }>;
   signOut: () => void;
   // Study Block Scheduling
   scheduleStudyBlock: (block: {
@@ -403,9 +430,56 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   });
 
   // UI States
-  const [activeView, setActiveView] = useState<
-    'home' | 'timeline' | 'tasks' | 'schedule' | 'attendance' | 'academic' | 'analytics' | 'ai' | 'settings'
-  >('home');
+  const [activeView, setActiveViewState] = useState<AppViewType>(() => {
+    if (typeof window !== 'undefined') {
+      const p = window.location.pathname.toLowerCase();
+      if (p === '/tasks') return 'tasks';
+      if (p === '/calendar' || p === '/schedule') return 'schedule';
+      if (p === '/projects') return 'projects';
+      if (p === '/profile') return 'profile';
+      if (p === '/settings') return 'settings';
+      if (p === '/timeline') return 'timeline';
+      if (p === '/attendance') return 'attendance';
+      if (p === '/academic') return 'academic';
+      if (p === '/analytics') return 'analytics';
+      if (p === '/ai') return 'ai';
+    }
+    return 'home';
+  });
+
+  const navigateToPath = (path: string, replace: boolean = false) => {
+    if (typeof window === 'undefined') return;
+    if (replace) {
+      window.history.replaceState({}, '', path);
+    } else {
+      window.history.pushState({}, '', path);
+    }
+    window.dispatchEvent(new PopStateEvent('popstate'));
+  };
+
+  const setActiveView = (view: AppViewType) => {
+    setActiveViewState(view);
+    if (typeof window !== 'undefined') {
+      const routeMap: Record<AppViewType, string> = {
+        home: '/dashboard',
+        timeline: '/timeline',
+        tasks: '/tasks',
+        schedule: '/calendar',
+        projects: '/projects',
+        profile: '/profile',
+        attendance: '/attendance',
+        academic: '/academic',
+        analytics: '/analytics',
+        ai: '/ai',
+        settings: '/settings',
+      };
+      const targetPath = routeMap[view] || '/dashboard';
+      if (window.location.pathname !== targetPath) {
+        window.history.pushState({}, '', targetPath);
+      }
+    }
+  };
+
   const [isAiDrawerOpen, setIsAiDrawerOpen] = useState(false);
   const [isAttendanceModalOpen, setIsAttendanceModalOpen] = useState(false);
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
@@ -415,6 +489,10 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const [isPersonalizationWizardOpen, setIsPersonalizationWizardOpen] = useState(false);
   const [isRecalibrating, setIsRecalibrating] = useState(false);
   const [recalibrateNotice, setRecalibrateNotice] = useState<string | null>(null);
+
+  // Projects & Calendar Events State (Strictly scoped per user)
+  const [projects, setProjects] = useState<ProjectItem[]>([]);
+  const [calendarEvents, setCalendarEvents] = useState<CalendarEventItem[]>([]);
 
   // User XP and Streak State - START AT ZERO for fresh account!
   const [userXp, setUserXp] = useState<number>(() => {
@@ -1068,14 +1146,314 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     if (saved) {
       try {
         const parsed = JSON.parse(saved);
-        if (parsed && parsed.isAuthenticated) {
+        if (parsed && parsed.isAuthenticated && parsed.id) {
           return parsed;
         }
       } catch (e) {}
     }
-    // By default for a new user, start unauthenticated (null) so they see Login / Sign Up!
     return null;
   });
+
+  // Helper: Generate starter projects & events for a user ID
+  const getStarterProjectsForUser = (userId: string): ProjectItem[] => {
+    const nextWeek = new Date(Date.now() + 5 * 86400000).toISOString().split('T')[0];
+    const twoWeeks = new Date(Date.now() + 12 * 86400000).toISOString().split('T')[0];
+    return [
+      {
+        id: `proj-${userId.slice(-6)}-1`,
+        userId,
+        name: 'Semester Core & Academic Excellence',
+        description: 'Structured 1-hour deep study blocks, syllabus completion, and lab viva preparation.',
+        status: 'active',
+        progress: 68,
+        dueDate: nextWeek,
+        color: '#6C4DFF',
+        createdAt: new Date().toISOString(),
+      },
+      {
+        id: `proj-${userId.slice(-6)}-2`,
+        userId,
+        name: 'Full-Stack Capstone & DSA Sprint',
+        description: 'Building production-ready engineering projects and solving daily algorithm problems.',
+        status: 'active',
+        progress: 45,
+        dueDate: twoWeeks,
+        color: '#3B9CFF',
+        createdAt: new Date().toISOString(),
+      },
+    ];
+  };
+
+  const getStarterEventsForUser = (userId: string): CalendarEventItem[] => {
+    const today = new Date().toISOString().split('T')[0];
+    const tomorrow = new Date(Date.now() + 86400000).toISOString().split('T')[0];
+    const inThreeDays = new Date(Date.now() + 3 * 86400000).toISOString().split('T')[0];
+    return [
+      {
+        id: `evt-${userId.slice(-6)}-1`,
+        userId,
+        title: 'Algorithm Design & Problem Solving Sprint',
+        date: today,
+        startTime: '18:00',
+        endTime: '19:00',
+        type: 'study',
+        notes: 'Focus on dynamic programming and graph traversal.',
+        createdAt: new Date().toISOString(),
+      },
+      {
+        id: `evt-${userId.slice(-6)}-2`,
+        userId,
+        title: 'Project Milestone Review & Submission',
+        date: tomorrow,
+        startTime: '14:00',
+        endTime: '15:00',
+        type: 'deadline',
+        notes: 'Prepare demo walkthrough and architecture slides.',
+        createdAt: new Date().toISOString(),
+      },
+      {
+        id: `evt-${userId.slice(-6)}-3`,
+        userId,
+        title: 'Mid-Semester Assessment & Lab Evaluation',
+        date: inThreeDays,
+        startTime: '10:30',
+        endTime: '12:30',
+        type: 'milestone',
+        notes: 'Review unit 1-3 notes and previous year questions.',
+        createdAt: new Date().toISOString(),
+      },
+    ];
+  };
+
+  // Load strictly isolated user data whenever currentUser.id changes
+  useEffect(() => {
+    if (!currentUser || !currentUser.isAuthenticated || !currentUser.id) {
+      setProjects([]);
+      setCalendarEvents([]);
+      return;
+    }
+
+    const uid = currentUser.id;
+    const userPrefix = `planzo_u_${uid}_`;
+
+    // 1. Load user-specific Timetable
+    const savedTimetable = localStorage.getItem(`${userPrefix}timetable`);
+    if (savedTimetable) {
+      try {
+        const parsed = JSON.parse(savedTimetable);
+        if (Array.isArray(parsed) && parsed.length > 0) {
+          setTimetable(parsed);
+        }
+      } catch (e) {}
+    }
+
+    // 2. Load user-specific Scheduled Tasks
+    const savedScheduled = localStorage.getItem(`${userPrefix}scheduled_tasks`);
+    if (savedScheduled) {
+      try {
+        setScheduledTasks(JSON.parse(savedScheduled));
+      } catch (e) {}
+    } else {
+      setScheduledTasks({});
+    }
+
+    // 3. Load user-specific Projects
+    const savedProjects = localStorage.getItem(`${userPrefix}projects`);
+    if (savedProjects) {
+      try {
+        const parsed = JSON.parse(savedProjects);
+        setProjects(Array.isArray(parsed) ? parsed : getStarterProjectsForUser(uid));
+      } catch (e) {
+        setProjects(getStarterProjectsForUser(uid));
+      }
+    } else {
+      const starter = getStarterProjectsForUser(uid);
+      setProjects(starter);
+      localStorage.setItem(`${userPrefix}projects`, JSON.stringify(starter));
+    }
+
+    // 4. Load user-specific Calendar Events
+    const savedEvents = localStorage.getItem(`${userPrefix}events`);
+    if (savedEvents) {
+      try {
+        const parsed = JSON.parse(savedEvents);
+        setCalendarEvents(Array.isArray(parsed) ? parsed : getStarterEventsForUser(uid));
+      } catch (e) {
+        setCalendarEvents(getStarterEventsForUser(uid));
+      }
+    } else {
+      const starter = getStarterEventsForUser(uid);
+      setCalendarEvents(starter);
+      localStorage.setItem(`${userPrefix}events`, JSON.stringify(starter));
+    }
+
+    // 5. Load user-specific XP & Streak
+    const savedXp = localStorage.getItem(`${userPrefix}xp`);
+    if (savedXp !== null) setUserXp(parseInt(savedXp, 10) || 0);
+    const savedStreak = localStorage.getItem(`${userPrefix}streak`);
+    if (savedStreak !== null) setUserStreak(parseInt(savedStreak, 10) || 0);
+
+    // 6. Also fetch from backend /api/workspace if sessionToken is available
+    if (currentUser.sessionToken) {
+      fetch('/api/workspace', {
+        headers: { Authorization: `Bearer ${currentUser.sessionToken}` },
+      })
+        .then((r) => (r.ok ? r.json() : null))
+        .then((data) => {
+          if (!data) return;
+          if (data.workspace?.timetable && Array.isArray(data.workspace.timetable) && data.workspace.timetable.length > 0) {
+            setTimetable(data.workspace.timetable);
+            localStorage.setItem(`${userPrefix}timetable`, JSON.stringify(data.workspace.timetable));
+          }
+          if (data.workspace?.scheduledTasks) {
+            setScheduledTasks(data.workspace.scheduledTasks);
+            localStorage.setItem(`${userPrefix}scheduled_tasks`, JSON.stringify(data.workspace.scheduledTasks));
+          }
+          if (Array.isArray(data.projects) && data.projects.length > 0) {
+            const mappedProjects: ProjectItem[] = data.projects.map((p: any) => ({
+              id: p.id,
+              userId: p.user_id || uid,
+              name: p.name,
+              description: p.description,
+              status: p.status || 'active',
+              progress: Number(p.progress ?? 50),
+              dueDate: p.due_date || p.dueDate || new Date().toISOString().split('T')[0],
+              color: p.color || '#6C4DFF',
+              createdAt: p.created_at || p.createdAt || new Date().toISOString(),
+            }));
+            setProjects(mappedProjects);
+            localStorage.setItem(`${userPrefix}projects`, JSON.stringify(mappedProjects));
+          }
+          if (Array.isArray(data.events) && data.events.length > 0) {
+            const mappedEvents: CalendarEventItem[] = data.events.map((e: any) => ({
+              id: e.id,
+              userId: e.user_id || uid,
+              title: e.title,
+              date: e.date,
+              startTime: e.start_time || e.startTime || '10:00',
+              endTime: e.end_time || e.endTime || '11:00',
+              type: e.type || 'study',
+              notes: e.notes || '',
+              createdAt: e.created_at || e.createdAt || new Date().toISOString(),
+            }));
+            setCalendarEvents(mappedEvents);
+            localStorage.setItem(`${userPrefix}events`, JSON.stringify(mappedEvents));
+          }
+        })
+        .catch(() => {});
+    }
+  }, [currentUser?.id]);
+
+  // Persist user-scoped changes whenever timetable, scheduledTasks, projects, or events change
+  useEffect(() => {
+    if (!currentUser || !currentUser.isAuthenticated || !currentUser.id) return;
+    const uid = currentUser.id;
+    const userPrefix = `planzo_u_${uid}_`;
+
+    localStorage.setItem(`${userPrefix}timetable`, JSON.stringify(timetable));
+    localStorage.setItem(`${userPrefix}scheduled_tasks`, JSON.stringify(scheduledTasks));
+    localStorage.setItem(`${userPrefix}projects`, JSON.stringify(projects));
+    localStorage.setItem(`${userPrefix}events`, JSON.stringify(calendarEvents));
+    localStorage.setItem(`${userPrefix}xp`, userXp.toString());
+    localStorage.setItem(`${userPrefix}streak`, userStreak.toString());
+
+    if (currentUser.sessionToken) {
+      fetch('/api/workspace/sync', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${currentUser.sessionToken}`,
+        },
+        body: JSON.stringify({
+          workspace: {
+            timetable,
+            scheduledTasks,
+            profile,
+            userXp,
+            userStreak,
+          },
+          tasks: timetable,
+          projects: projects.map((p) => ({
+            id: p.id,
+            name: p.name,
+            description: p.description,
+            status: p.status,
+            progress: p.progress,
+            due_date: p.dueDate,
+            color: p.color,
+            created_at: p.createdAt,
+          })),
+          events: calendarEvents.map((e) => ({
+            id: e.id,
+            title: e.title,
+            date: e.date,
+            start_time: e.startTime,
+            end_time: e.endTime,
+            type: e.type,
+            notes: e.notes,
+            created_at: e.createdAt,
+          })),
+        }),
+      }).catch(() => {});
+    }
+  }, [timetable, scheduledTasks, projects, calendarEvents, userXp, userStreak, currentUser?.id]);
+
+  // Projects CRUD (User-Isolated)
+  const addProject = (proj: Omit<ProjectItem, 'id' | 'userId' | 'createdAt'>) => {
+    const uid = currentUser?.id || 'guest';
+    const newProj: ProjectItem = {
+      ...proj,
+      id: `proj-${Date.now()}`,
+      userId: uid,
+      createdAt: new Date().toISOString(),
+    };
+    setProjects((prev) => [newProj, ...prev]);
+    awardXp(30, `Created Project: ${proj.name}`);
+    setRecalibrateNotice(`Project "${proj.name}" created in your workspace.`);
+  };
+
+  const updateProject = (id: string, updates: Partial<ProjectItem>) => {
+    setProjects((prev) =>
+      prev.map((p) => {
+        if (p.id !== id) return p;
+        const next = { ...p, ...updates };
+        if (next.progress >= 100 && p.status !== 'completed') {
+          next.status = 'completed';
+          awardXp(50, `Project Completed: ${p.name}`);
+        }
+        return next;
+      })
+    );
+  };
+
+  const deleteProject = (id: string) => {
+    setProjects((prev) => prev.filter((p) => p.id !== id));
+  };
+
+  // Calendar Events CRUD (User-Isolated)
+  const addCalendarEvent = (evt: Omit<CalendarEventItem, 'id' | 'userId' | 'createdAt'>) => {
+    const uid = currentUser?.id || 'guest';
+    const newEvt: CalendarEventItem = {
+      ...evt,
+      id: `evt-${Date.now()}`,
+      userId: uid,
+      createdAt: new Date().toISOString(),
+    };
+    setCalendarEvents((prev) => [...prev, newEvt].sort((a, b) => a.date.localeCompare(b.date)));
+    addTaskForDate({
+      title: evt.title,
+      category: evt.type === 'deadline' ? 'assignment' : 'study',
+      startTime: evt.startTime,
+      endTime: evt.endTime,
+      completed: false,
+      date: evt.date,
+      cognitiveWeight: evt.type === 'deadline' ? 4 : 3,
+    });
+  };
+
+  const deleteCalendarEvent = (id: string) => {
+    setCalendarEvents((prev) => prev.filter((e) => e.id !== id));
+  };
 
   const signUp = (userData: {
     name: string;
@@ -1090,15 +1468,35 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     semester?: number;
     rollNo?: string;
     avatarUrl?: string;
-  }) => {
+    id?: string;
+    sessionToken?: string;
+  }): { ok: boolean; error?: string; user?: AuthUser } => {
     const todayStr = new Date().toISOString().split('T')[0];
     const derivedFirstName = userData.firstName || (userData.name ? userData.name.trim().split(' ')[0] : 'Student');
     const derivedLastName = userData.lastName || (userData.name && userData.name.trim().split(' ').length > 1 ? userData.name.trim().split(' ').slice(1).join(' ') : '');
     const fullName = `${derivedFirstName} ${derivedLastName}`.trim();
     const cleanEmail = userData.email?.toLowerCase().trim() || `${derivedFirstName.toLowerCase().replace(/[^a-z0-9]/g, '')}@student.planzo`;
 
+    // Check duplicate email in localStorage registry
+    try {
+      const savedUsersRaw = localStorage.getItem('planzo_registered_users_v1');
+      const registeredUsers: AuthUser[] = savedUsersRaw ? JSON.parse(savedUsersRaw) : [];
+      const existingByEmail = registeredUsers.find(
+        (u) => u.email && u.email.toLowerCase() === cleanEmail
+      );
+      if (existingByEmail && !userData.sessionToken) {
+        return {
+          ok: false,
+          error: 'An account with this email already exists. Please log in instead.',
+        };
+      }
+    } catch (e) {}
+
+    const userId = userData.id || `usr-${Date.now()}`;
+    const userPrefix = `planzo_u_${userId}_`;
+
     const newUser: AuthUser = {
-      id: `usr-${Date.now()}`,
+      id: userId,
       name: fullName,
       firstName: derivedFirstName,
       lastName: derivedLastName,
@@ -1114,34 +1512,39 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       isAuthenticated: true,
       joinedAt: 'Just now',
       accountCreatedAt: todayStr,
+      sessionToken: userData.sessionToken,
     };
 
-    // Save in registered users list in localStorage
     try {
       const savedUsersRaw = localStorage.getItem('planzo_registered_users_v1');
       const registeredUsers: AuthUser[] = savedUsersRaw ? JSON.parse(savedUsersRaw) : [];
-      const filtered = registeredUsers.filter((u) => u.name.toLowerCase() !== newUser.name.toLowerCase() && (!newUser.email || u.email?.toLowerCase() !== newUser.email));
+      const filtered = registeredUsers.filter((u) => u.email?.toLowerCase() !== cleanEmail);
       filtered.push(newUser);
       localStorage.setItem('planzo_registered_users_v1', JSON.stringify(filtered));
     } catch (e) {
       console.error('Error saving registered user', e);
     }
 
-    setCurrentUser(newUser);
-    localStorage.setItem('planzo_auth_user_v1', JSON.stringify(newUser));
+    // Initialize isolated starter data for this new user
+    const starterProjs = getStarterProjectsForUser(userId);
+    const starterEvts = getStarterEventsForUser(userId);
+    setProjects(starterProjs);
+    setCalendarEvents(starterEvts);
+    localStorage.setItem(`${userPrefix}projects`, JSON.stringify(starterProjs));
+    localStorage.setItem(`${userPrefix}events`, JSON.stringify(starterEvts));
 
-    // Reset starting state for newly created account: 0 XP, 0 Streak, clean calendar!
     setUserXp(0);
     setUserStreak(0);
+    localStorage.setItem(`${userPrefix}xp`, '0');
+    localStorage.setItem(`${userPrefix}streak`, '0');
     localStorage.setItem('planzo_user_xp_v5', '0');
     localStorage.setItem('planzo_user_streak_v5', '0');
 
-    // Clean scheduled tasks (0 tasks to begin with)
     const freshTasks: Record<string, DailyScheduledTask[]> = {};
     setScheduledTasks(freshTasks);
+    localStorage.setItem(`${userPrefix}scheduled_tasks`, JSON.stringify(freshTasks));
     localStorage.setItem(STORAGE_KEYS.SCHEDULED_TASKS, JSON.stringify(freshTasks));
 
-    // Clean initial subjects and 0/0 attendance for selected semester
     const targetSem = userData.semester || 1;
     const semSubjects = (targetSem === 1 || targetSem === 2)
       ? FOUNDATION_ENGINEERING_SUBJECTS.slice(0, 5)
@@ -1189,7 +1592,11 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     localStorage.setItem(STORAGE_KEYS.PROFILE, JSON.stringify(newProfile));
     localStorage.setItem('planzo_profile_v3', JSON.stringify(newProfile));
 
-    setRecalibrateNotice(`Welcome to PlanZo, ${derivedFirstName}! Student workspace unlocked.`);
+    setCurrentUser(newUser);
+    localStorage.setItem('planzo_auth_user_v1', JSON.stringify(newUser));
+
+    setRecalibrateNotice(`Account created successfully. Welcome to Planzo, ${derivedFirstName}!`);
+    return { ok: true, user: newUser };
   };
 
   const signIn = (identifier: string, password?: string): boolean => {
@@ -1197,7 +1604,6 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     const cleanLower = cleanId.toLowerCase();
     const todayStr = new Date().toISOString().split('T')[0];
 
-    // Check if user is in planzo_registered_users_v1 by name, firstName, email, or rollNo
     let matchedUser: AuthUser | null = null;
     try {
       const savedUsersRaw = localStorage.getItem('planzo_registered_users_v1');
@@ -1213,28 +1619,55 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       }
     } catch (e) {}
 
-    let userToLogin: AuthUser;
-
     if (matchedUser) {
-      userToLogin = {
+      // Strictly validate password if the user registered with one and this is not a verified OAuth token
+      if (
+        password !== 'oauth_verified_token' &&
+        matchedUser.password &&
+        matchedUser.password !== password
+      ) {
+        return false;
+      }
+      const userToLogin: AuthUser = {
         ...matchedUser,
         isAuthenticated: true,
       };
-    } else {
-      // If user logs in with a name that was not previously registered, use clean name
-      const formatted = cleanId.includes('@')
-        ? cleanId.split('@')[0]
-        : cleanId;
+      setCurrentUser(userToLogin);
+      localStorage.setItem('planzo_auth_user_v1', JSON.stringify(userToLogin));
+
+      const updatedProfile: StudentProfile = {
+        ...profile,
+        name: userToLogin.name,
+        firstName: userToLogin.firstName || userToLogin.name.split(' ')[0],
+        lastName: userToLogin.lastName || '',
+        phone: userToLogin.phone || profile.phone || '',
+        isVerified: true,
+        college: userToLogin.college,
+        customCollege: userToLogin.college,
+        branch: userToLogin.branch,
+        semester: userToLogin.semester,
+        rollNo: userToLogin.rollNo,
+      };
+      setProfile(updatedProfile);
+      localStorage.setItem(STORAGE_KEYS.PROFILE, JSON.stringify(updatedProfile));
+      localStorage.setItem('planzo_profile_v3', JSON.stringify(updatedProfile));
+      setRecalibrateNotice(`Welcome back, ${userToLogin.firstName || userToLogin.name}!`);
+      return true;
+    }
+
+    // Only allow auto-creation if explicitly using OAuth / Quick Demo
+    if (password === 'oauth_verified_token' || cleanLower === 'student.demo@planzo.edu') {
+      const formatted = cleanId.includes('@') ? cleanId.split('@')[0] : cleanId;
       const fName = formatted.split(' ')[0] || 'Student';
       const lName = formatted.split(' ').slice(1).join(' ');
-
-      userToLogin = {
-        id: `usr-${Date.now()}`,
+      const userToLogin: AuthUser = {
+        id: `usr-${cleanLower.replace(/[^a-z0-9]/g, '')}`,
         name: cleanId || 'Student',
         firstName: fName,
         lastName: lName,
-        email: cleanId.includes('@') ? cleanLower : `${fName.toLowerCase()}@student.planzo`,
+        email: cleanId.includes('@') ? cleanLower : `${fName.toLowerCase()}@planzo.app`,
         phone: '',
+        password: password || 'demo1234',
         isVerified: true,
         rollNo: '',
         college: profile.customCollege || profile.college || 'Samrat Ashok Technological Institute (SATI), Vidisha M.P.',
@@ -1245,43 +1678,265 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         joinedAt: 'Active Member',
         accountCreatedAt: todayStr,
       };
-
       try {
         const savedUsersRaw = localStorage.getItem('planzo_registered_users_v1');
         const registeredUsers: AuthUser[] = savedUsersRaw ? JSON.parse(savedUsersRaw) : [];
         registeredUsers.push(userToLogin);
         localStorage.setItem('planzo_registered_users_v1', JSON.stringify(registeredUsers));
       } catch (e) {}
+      setCurrentUser(userToLogin);
+      localStorage.setItem('planzo_auth_user_v1', JSON.stringify(userToLogin));
+      return true;
     }
 
-    setCurrentUser(userToLogin);
-    localStorage.setItem('planzo_auth_user_v1', JSON.stringify(userToLogin));
+    return false;
+  };
 
-    const updatedProfile: StudentProfile = {
-      ...profile,
-      name: userToLogin.name,
-      firstName: userToLogin.firstName || userToLogin.name.split(' ')[0],
-      lastName: userToLogin.lastName || '',
-      phone: userToLogin.phone || profile.phone || '',
-      isVerified: userToLogin.isVerified || false,
-      college: userToLogin.college,
-      customCollege: userToLogin.college,
-      branch: userToLogin.branch,
-      semester: userToLogin.semester,
-      rollNo: userToLogin.rollNo,
-    };
-    setProfile(updatedProfile);
-    localStorage.setItem(STORAGE_KEYS.PROFILE, JSON.stringify(updatedProfile));
-    localStorage.setItem('planzo_profile_v3', JSON.stringify(updatedProfile));
+  // Full Backend + Local Synchronized Registration
+  const registerAccount = async (
+    fullName: string,
+    email: string,
+    password: string
+  ): Promise<{ ok: boolean; error?: string; user?: AuthUser }> => {
+    const cleanName = fullName.trim();
+    const cleanEmail = email.trim().toLowerCase();
 
-    setRecalibrateNotice(`Welcome back, ${userToLogin.firstName || userToLogin.name}!`);
-    return true;
+    if (!cleanName || !cleanEmail || !password) {
+      return { ok: false, error: 'All fields are required.' };
+    }
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(cleanEmail)) {
+      return { ok: false, error: 'Please enter a valid email address.' };
+    }
+    if (password.length < 8) {
+      return { ok: false, error: 'Password must be at least 8 characters long.' };
+    }
+
+    try {
+      const res = await fetch('/api/auth/signup', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ fullName: cleanName, email: cleanEmail, password }),
+      });
+      const contentType = res.headers.get('content-type') || '';
+      if (contentType.includes('application/json')) {
+        const data = await res.json();
+        if (!res.ok) {
+          return { ok: false, error: data.error || 'Could not create account.' };
+        }
+        const parts = cleanName.split(' ');
+        const result = signUp({
+          id: data.user?.id,
+          name: cleanName,
+          firstName: parts[0] || cleanName,
+          lastName: parts.slice(1).join(' '),
+          email: cleanEmail,
+          password,
+          isVerified: true,
+          sessionToken: data.token,
+        });
+        return result;
+      }
+    } catch (e) {
+      // Fallback to local persistent store if running on static host
+    }
+
+    const parts = cleanName.split(' ');
+    return signUp({
+      name: cleanName,
+      firstName: parts[0] || cleanName,
+      lastName: parts.slice(1).join(' '),
+      email: cleanEmail,
+      password,
+      isVerified: true,
+    });
+  };
+
+  // Full Backend + Local Synchronized Login
+  const authenticateWithCredentials = async (
+    email: string,
+    password: string
+  ): Promise<{ ok: boolean; error?: string; user?: AuthUser }> => {
+    const cleanEmail = email.trim().toLowerCase();
+    if (!cleanEmail || !password) {
+      return { ok: false, error: 'Please enter both your email and password.' };
+    }
+
+    try {
+      const res = await fetch('/api/auth/login', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email: cleanEmail, password }),
+      });
+      const contentType = res.headers.get('content-type') || '';
+      if (contentType.includes('application/json')) {
+        const data = await res.json();
+        if (!res.ok) {
+          // Also check localStorage in case user registered locally before server restart
+          const localSuccess = signIn(cleanEmail, password);
+          if (localSuccess) {
+            return { ok: true };
+          }
+          return { ok: false, error: data.error || 'Invalid email or password.' };
+        }
+
+        // Sync user into local registry and state
+        const dbUser = data.user;
+        const parts = (dbUser.full_name || cleanEmail).split(' ');
+        const fName = parts[0] || 'Student';
+        const lName = parts.slice(1).join(' ');
+        const syncedUser: AuthUser = {
+          id: dbUser.id,
+          name: dbUser.full_name,
+          firstName: fName,
+          lastName: lName,
+          email: dbUser.email,
+          password,
+          isVerified: true,
+          college: dbUser.college || profile.college || 'Samrat Ashok Technological Institute (SATI), Vidisha M.P.',
+          branch: dbUser.branch || profile.branch || 'B.Tech. Computer Science & Engineering',
+          semester: dbUser.semester || profile.semester || 1,
+          avatarUrl: dbUser.avatar_url || `https://api.dicebear.com/7.x/bottts/svg?seed=${encodeURIComponent(fName)}&colors=emerald,cyan,teal`,
+          isAuthenticated: true,
+          joinedAt: 'Active Member',
+          accountCreatedAt: (dbUser.created_at || new Date().toISOString()).split('T')[0],
+          sessionToken: data.token,
+        };
+
+        try {
+          const savedUsersRaw = localStorage.getItem('planzo_registered_users_v1');
+          const registeredUsers: AuthUser[] = savedUsersRaw ? JSON.parse(savedUsersRaw) : [];
+          const filtered = registeredUsers.filter((u) => u.email?.toLowerCase() !== cleanEmail);
+          filtered.push(syncedUser);
+          localStorage.setItem('planzo_registered_users_v1', JSON.stringify(filtered));
+        } catch (e) {}
+
+        setCurrentUser(syncedUser);
+        localStorage.setItem('planzo_auth_user_v1', JSON.stringify(syncedUser));
+
+        setProfile((prev) => {
+          const updated = {
+            ...prev,
+            name: syncedUser.name,
+            firstName: syncedUser.firstName,
+            lastName: syncedUser.lastName,
+            college: syncedUser.college,
+            customCollege: syncedUser.college,
+            branch: syncedUser.branch,
+            semester: syncedUser.semester,
+          };
+          localStorage.setItem(STORAGE_KEYS.PROFILE, JSON.stringify(updated));
+          return updated;
+        });
+
+        setRecalibrateNotice(`Welcome back, ${fName}!`);
+        return { ok: true, user: syncedUser };
+      }
+    } catch (e) {}
+
+    // Fallback check against local registry
+    try {
+      const savedUsersRaw = localStorage.getItem('planzo_registered_users_v1');
+      const users: AuthUser[] = savedUsersRaw ? JSON.parse(savedUsersRaw) : [];
+      const found = users.find(
+        (u) =>
+          (u.email && u.email.toLowerCase() === cleanEmail) ||
+          u.name.toLowerCase() === cleanEmail
+      );
+      if (!found) {
+        return { ok: false, error: 'No account found with that email address. Please sign up first.' };
+      }
+      if (found.password && found.password !== password) {
+        return { ok: false, error: 'Incorrect email or password. Please try again.' };
+      }
+      signIn(cleanEmail, password);
+      return { ok: true, user: found };
+    } catch (e) {
+      return { ok: false, error: 'Authentication error. Please try again.' };
+    }
+  };
+
+  // Password Reset Flow (Verify email & update password)
+  const requestPasswordReset = async (
+    email: string,
+    newPassword?: string
+  ): Promise<{ ok: boolean; step?: string; message?: string; error?: string }> => {
+    const cleanEmail = email.trim().toLowerCase();
+    if (!cleanEmail) {
+      return { ok: false, error: 'Please enter your registered email address.' };
+    }
+
+    try {
+      const res = await fetch('/api/auth/forgot-password', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email: cleanEmail, newPassword }),
+      });
+      const contentType = res.headers.get('content-type') || '';
+      if (contentType.includes('application/json')) {
+        const data = await res.json();
+        if (res.ok) {
+          // Also sync updated password in local registry if newPassword was provided
+          if (newPassword) {
+            try {
+              const savedUsersRaw = localStorage.getItem('planzo_registered_users_v1');
+              if (savedUsersRaw) {
+                const users: AuthUser[] = JSON.parse(savedUsersRaw);
+                const updated = users.map((u) =>
+                  u.email?.toLowerCase() === cleanEmail ? { ...u, password: newPassword } : u
+                );
+                localStorage.setItem('planzo_registered_users_v1', JSON.stringify(updated));
+              }
+            } catch (e) {}
+          }
+          return { ok: true, step: data.step, message: data.message };
+        }
+      }
+    } catch (e) {}
+
+    // Check local registry fallback
+    try {
+      const savedUsersRaw = localStorage.getItem('planzo_registered_users_v1');
+      const users: AuthUser[] = savedUsersRaw ? JSON.parse(savedUsersRaw) : [];
+      const idx = users.findIndex((u) => u.email?.toLowerCase() === cleanEmail);
+      if (idx === -1) {
+        return { ok: false, error: 'No account found with that email address.' };
+      }
+      if (newPassword !== undefined) {
+        if (newPassword.length < 8) {
+          return { ok: false, error: 'New password must be at least 8 characters long.' };
+        }
+        users[idx].password = newPassword;
+        localStorage.setItem('planzo_registered_users_v1', JSON.stringify(users));
+        return {
+          ok: true,
+          step: 'reset_complete',
+          message: 'Your password has been reset successfully! You can now log in with your new password.',
+        };
+      }
+      return {
+        ok: true,
+        step: 'email_verified',
+        message: 'Account verified! Enter your new password below to complete the reset.',
+      };
+    } catch (e) {
+      return { ok: false, error: 'Failed to process password reset.' };
+    }
   };
 
   const signOut = () => {
+    if (currentUser?.sessionToken) {
+      fetch('/api/auth/logout', {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${currentUser.sessionToken}` },
+      }).catch(() => {});
+    }
     setCurrentUser(null);
     localStorage.removeItem('planzo_auth_user_v1');
-    setRecalibrateNotice('You are now browsing as guest.');
+    if (typeof window !== 'undefined') {
+      window.history.replaceState({}, '', '/login');
+      window.dispatchEvent(new PopStateEvent('popstate'));
+    }
   };
 
   const scheduleStudyBlock = (block: {
@@ -1358,6 +2013,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         startZenMode,
         activeView,
         setActiveView,
+        navigateToPath,
         isAiDrawerOpen,
         setIsAiDrawerOpen,
         isAttendanceModalOpen,
@@ -1385,6 +2041,14 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         toggleTaskForDate,
         deleteTaskForDate,
         getDateTaskStats,
+        // Projects & Calendar Events
+        projects,
+        addProject,
+        updateProject,
+        deleteProject,
+        calendarEvents,
+        addCalendarEvent,
+        deleteCalendarEvent,
         // XP & Day Streak Feature
         userXp,
         userStreak,
@@ -1393,6 +2057,9 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         currentUser,
         signUp,
         signIn,
+        authenticateWithCredentials,
+        registerAccount,
+        requestPasswordReset,
         signOut,
         // Study Block Scheduling
         scheduleStudyBlock,

@@ -97,6 +97,31 @@ export interface AuthUser {
   isAuthenticated: boolean;
   joinedAt: string;
   accountCreatedAt?: string; // YYYY-MM-DD
+  sessionToken?: string;
+}
+
+export interface ProjectItem {
+  id: string;
+  userId: string;
+  name: string;
+  description: string;
+  status: 'planning' | 'active' | 'completed';
+  progress: number;
+  dueDate: string; // YYYY-MM-DD
+  color: string;
+  createdAt: string;
+}
+
+export interface CalendarEventItem {
+  id: string;
+  userId: string;
+  title: string;
+  date: string; // YYYY-MM-DD
+  startTime: string; // HH:MM
+  endTime: string;   // HH:MM
+  type: 'deadline' | 'meeting' | 'study' | 'milestone';
+  notes?: string;
+  createdAt: string;
 }
 
 export interface MentalBandwidthState {

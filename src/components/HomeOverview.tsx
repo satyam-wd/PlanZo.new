@@ -251,50 +251,85 @@ export const HomeOverview: React.FC = () => {
       )}
 
       {/* ========================================================================= */}
-      {/* 3. ATTENDANCE STATUS (Prioritized at Top)                                 */}
+      {/* 3. ATTENDANCE STATUS (Prioritized at Top with Teal/Emerald Hover Effect)  */}
       {/* ========================================================================= */}
       <div
         onClick={() => setActiveView('attendance')}
-        className="rounded-2xl border border-stone-200/80 dark:border-stone-800 bg-white dark:bg-stone-900 p-5 shadow-xs flex flex-col justify-between hover:border-teal-500/60 transition-all cursor-pointer group"
+        className="rounded-2xl border border-stone-200/80 dark:border-stone-800 bg-white dark:bg-stone-900 p-5 shadow-xs flex flex-col justify-between hover:border-teal-500 dark:hover:border-teal-500/80 hover:bg-gradient-to-r hover:from-teal-50/60 hover:via-emerald-50/30 hover:to-white dark:hover:from-teal-950/40 dark:hover:via-emerald-950/20 dark:hover:to-stone-900 hover:shadow-lg hover:shadow-teal-600/10 hover:-translate-y-0.5 transition-all duration-200 cursor-pointer group"
       >
-        <div className="space-y-2">
+        <div className="space-y-2.5">
           <div className="flex items-center justify-between">
-            <span className="text-xs font-bold uppercase tracking-wider text-stone-400 flex items-center gap-1.5">
+            <span className="text-xs font-bold uppercase tracking-wider text-stone-400 group-hover:text-teal-700 dark:group-hover:text-teal-400 transition-colors flex items-center gap-1.5">
               {isAttendanceSafe ? (
-                <ShieldCheck className="w-4 h-4 text-emerald-600" />
+                <ShieldCheck className="w-4 h-4 text-emerald-600 dark:text-emerald-400 group-hover:scale-110 transition-transform" />
               ) : (
-                <ShieldAlert className="w-4 h-4 text-amber-600" />
+                <ShieldAlert className="w-4 h-4 text-amber-600 group-hover:scale-110 transition-transform" />
               )}
               <span>Attendance Status</span>
             </span>
-            <span className={`text-[11px] font-bold px-2 py-0.5 rounded-full ${
+            <span className={`text-[11px] font-bold px-2.5 py-0.5 rounded-full border transition-all ${
               isAttendanceSafe
-                ? 'bg-emerald-50 text-emerald-700 dark:bg-emerald-950 dark:text-emerald-300'
-                : 'bg-amber-50 text-amber-700 dark:bg-amber-950 dark:text-amber-300'
+                ? 'bg-emerald-50 text-emerald-700 border-emerald-200/80 dark:bg-emerald-950/80 dark:text-emerald-300 dark:border-emerald-800/70 group-hover:bg-teal-600 group-hover:text-white group-hover:border-teal-500'
+                : 'bg-amber-50 text-amber-700 border-amber-200/80 dark:bg-amber-950 dark:text-amber-300 dark:border-amber-800'
             }`}>
               {isAttendanceSafe ? 'Safe (≥75%)' : 'Warning'}
             </span>
           </div>
 
           <div className="flex items-baseline gap-2">
-            <span className="text-3xl font-extrabold font-mono text-stone-900 dark:text-stone-100 tabular-nums">
+            <span className="text-3xl font-extrabold font-mono text-stone-900 dark:text-stone-100 group-hover:text-teal-700 dark:group-hover:text-teal-300 transition-colors tabular-nums">
               {overallAttendancePercentage}%
             </span>
-            <span className="text-xs text-stone-500">
+            <span className="text-xs text-stone-500 dark:text-stone-400">
               ({totalAttended}/{totalConducted} classes attended)
             </span>
           </div>
 
-          <p className="text-xs text-stone-500 leading-relaxed">
+          {/* Progress Bar with Teal/Emerald Gradient */}
+          <div className="h-1.5 w-full rounded-full bg-stone-100 dark:bg-stone-800 overflow-hidden">
+            <div
+              className="h-full rounded-full bg-gradient-to-r from-[#0F766E] via-[#0D9488] to-[#10B981] transition-all duration-500"
+              style={{ width: `${Math.min(100, overallAttendancePercentage)}%` }}
+            />
+          </div>
+
+          <p className="text-xs text-stone-500 dark:text-stone-400 leading-relaxed">
             {isAttendanceSafe
               ? `You have a buffer of ${safeBunks} safe classes you can miss while keeping 75%.`
               : `Attend next ${classesNeededFor75} consecutive lectures to recover safe margin.`}
           </p>
+
+          {/* Interactive Subject-Wise Quick Pill Preview on Hover */}
+          {attendance.length > 0 && (
+            <div className="pt-1 grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-2 opacity-85 group-hover:opacity-100 transition-opacity">
+              {attendance.slice(0, 5).map((sub) => {
+                const subPct = sub.totalClasses > 0 ? Math.round((sub.attendedClasses / sub.totalClasses) * 100) : 100;
+                return (
+                  <div
+                    key={sub.subjectId}
+                    className="px-2.5 py-1.5 rounded-xl border border-stone-200/70 dark:border-stone-800 bg-stone-50/70 dark:bg-stone-850/60 group-hover:border-teal-500/40 group-hover:bg-teal-50/50 dark:group-hover:bg-teal-950/40 transition-colors flex items-center justify-between gap-1.5 text-[11px]"
+                  >
+                    <span className="font-mono font-semibold text-stone-700 dark:text-stone-300 truncate">
+                      {sub.subjectCode}
+                    </span>
+                    <span className="font-mono font-bold text-teal-700 dark:text-teal-300 tabular-nums">
+                      {subPct}%
+                    </span>
+                  </div>
+                );
+              })}
+            </div>
+          )}
         </div>
 
-        <div className="pt-3 mt-3 border-t border-stone-100 dark:border-stone-800 flex items-center justify-between text-xs text-teal-700 dark:text-teal-400 font-semibold group-hover:underline">
-          <span>Open Attendance Simulator & Subject Drill-down</span>
-          <ChevronRight className="w-4 h-4" />
+        <div className="pt-3 mt-3 border-t border-stone-100 dark:border-stone-800 group-hover:border-teal-500/30 flex items-center justify-between gap-2">
+          <span className="text-xs text-stone-500 dark:text-stone-400">
+            AICTE 75% Mandatory Attendance Guard
+          </span>
+          <span className="px-3 py-1.5 rounded-xl border border-teal-500/40 bg-teal-50/80 dark:bg-teal-950/50 text-teal-800 dark:text-teal-300 group-hover:bg-gradient-to-r group-hover:from-[#0F766E] group-hover:to-[#10B981] group-hover:text-white group-hover:border-teal-500 group-hover:shadow-sm group-hover:shadow-teal-600/20 transition-all duration-150 text-xs font-semibold inline-flex items-center gap-1 whitespace-nowrap">
+            <span>Open Attendance Simulator</span>
+            <ChevronRight className="w-3.5 h-3.5 group-hover:translate-x-0.5 transition-transform" />
+          </span>
         </div>
       </div>
 
@@ -304,12 +339,12 @@ export const HomeOverview: React.FC = () => {
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
         
         {/* Productivity Summary */}
-        <div className="rounded-2xl border border-stone-200/80 dark:border-stone-800 bg-white dark:bg-stone-900 p-5 shadow-xs space-y-2.5">
+        <div className="rounded-2xl border border-stone-200/80 dark:border-stone-800 bg-white dark:bg-stone-900 p-5 shadow-xs space-y-2.5 hover:border-teal-500 dark:hover:border-teal-500/80 hover:bg-gradient-to-br hover:from-teal-50/40 hover:to-white dark:hover:from-teal-950/30 dark:hover:to-stone-900 hover:shadow-md hover:shadow-teal-600/10 hover:-translate-y-0.5 transition-all duration-200 group">
           <div className="flex items-center justify-between">
-            <span className="text-xs font-bold uppercase tracking-wider text-stone-400">
+            <span className="text-xs font-bold uppercase tracking-wider text-stone-400 group-hover:text-teal-700 dark:group-hover:text-teal-400 transition-colors">
               Today's Adherence
             </span>
-            <span className="text-xs font-mono font-bold text-teal-700 dark:text-teal-400">
+            <span className="text-xs font-mono font-bold text-teal-700 dark:text-teal-400 tabular-nums">
               {progressPercent}%
             </span>
           </div>
@@ -320,58 +355,62 @@ export const HomeOverview: React.FC = () => {
 
           <div className="h-2 w-full rounded-full bg-stone-100 dark:bg-stone-800 overflow-hidden">
             <div
-              className="h-full rounded-full bg-teal-600 transition-all duration-700"
+              className="h-full rounded-full bg-gradient-to-r from-[#0F766E] via-[#0D9488] to-[#10B981] transition-all duration-700"
               style={{ width: `${progressPercent}%` }}
             />
           </div>
 
-          <div className="text-[11px] text-stone-500 flex items-center justify-between pt-1">
-            <span>Mental Load: <strong>{bandwidth.status} ({bandwidth.densityScore}%)</strong></span>
+          <div className="text-[11px] text-stone-500 flex items-center justify-between gap-2 pt-1.5">
+            <span>Mental Load: <strong className="text-stone-700 dark:text-stone-200">{bandwidth.status} ({bandwidth.densityScore}%)</strong></span>
             <button
               onClick={() => setActiveView('analytics')}
-              className="text-teal-700 dark:text-teal-400 hover:underline font-semibold"
+              className="px-3 py-1.5 rounded-xl border border-teal-500/40 bg-teal-50/80 dark:bg-teal-950/50 text-teal-800 dark:text-teal-300 hover:bg-gradient-to-r hover:from-[#0F766E] hover:to-[#10B981] hover:text-white hover:border-teal-500 hover:shadow-sm hover:shadow-teal-600/20 hover:-translate-y-0.5 active:translate-y-0 transition-all duration-150 font-semibold text-xs inline-flex items-center gap-1 cursor-pointer whitespace-nowrap"
             >
-              Full Analytics →
+              <span>Full Analytics →</span>
             </button>
           </div>
         </div>
 
         {/* XP and Day Streak */}
-        <div className="rounded-2xl border border-stone-200/80 dark:border-stone-800 bg-white dark:bg-stone-900 p-5 shadow-xs flex items-center justify-between gap-4">
-          <div
-            onClick={() => setIsStreakModalOpen(true)}
-            className="flex-1 cursor-pointer group"
-          >
-            <div className="flex items-center gap-1.5 text-xs text-stone-400 font-semibold mb-1">
+        <div className="rounded-2xl border border-stone-200/80 dark:border-stone-800 bg-white dark:bg-stone-900 p-5 shadow-xs flex items-center justify-between gap-4 hover:border-teal-500 dark:hover:border-teal-500/80 hover:bg-gradient-to-br hover:from-teal-50/40 hover:to-white dark:hover:from-teal-950/30 dark:hover:to-stone-900 hover:shadow-md hover:shadow-teal-600/10 hover:-translate-y-0.5 transition-all duration-200">
+          <div className="flex-1 flex flex-col items-start justify-between space-y-1.5">
+            <div className="flex items-center gap-1.5 text-xs text-stone-400 font-semibold">
               <Flame className="w-3.5 h-3.5 text-amber-500 fill-amber-500" />
               <span>Day Streak</span>
             </div>
-            <div className="text-2xl font-extrabold font-mono text-stone-900 dark:text-stone-100">
+            <div className="text-2xl font-extrabold font-mono text-stone-900 dark:text-stone-100 tabular-nums">
               {userStreak} Days
             </div>
-            <div className="text-[11px] text-amber-600 dark:text-amber-400 group-hover:underline">
-              {completedCount >= 7
-                ? '7+ tasks completed · Streak active'
-                : `${Math.min(7, completedCount)}/7 tasks to count streak`}
-            </div>
+            <button
+              type="button"
+              onClick={() => setIsStreakModalOpen(true)}
+              className="mt-1 px-2.5 py-1.5 rounded-xl border border-teal-500/40 bg-teal-50/80 dark:bg-teal-950/50 text-teal-800 dark:text-teal-300 hover:bg-gradient-to-r hover:from-[#0F766E] hover:to-[#10B981] hover:text-white hover:border-teal-500 hover:shadow-sm hover:shadow-teal-600/20 hover:-translate-y-0.5 active:translate-y-0 transition-all duration-150 font-semibold text-[11px] inline-flex items-center gap-1 cursor-pointer whitespace-nowrap"
+            >
+              <span>
+                {completedCount >= 7
+                  ? '7+ tasks · Streak active →'
+                  : `${Math.min(7, completedCount)}/7 tasks to streak →`}
+              </span>
+            </button>
           </div>
 
-          <div className="h-10 w-px bg-stone-100 dark:bg-stone-800" />
+          <div className="h-14 w-px bg-stone-100 dark:bg-stone-800 shrink-0" />
 
-          <div
-            onClick={() => setIsXpModalOpen(true)}
-            className="flex-1 cursor-pointer group text-right"
-          >
-            <div className="flex items-center justify-end gap-1.5 text-xs text-stone-400 font-semibold mb-1">
-              <Zap className="w-3.5 h-3.5 text-teal-600 fill-teal-600" />
+          <div className="flex-1 flex flex-col items-end justify-between space-y-1.5 text-right">
+            <div className="flex items-center justify-end gap-1.5 text-xs text-stone-400 font-semibold">
+              <Zap className="w-3.5 h-3.5 text-teal-600 dark:text-teal-400 fill-teal-600 dark:fill-teal-400" />
               <span>Engineering XP</span>
             </div>
-            <div className="text-2xl font-extrabold font-mono text-teal-700 dark:text-teal-300">
+            <div className="text-2xl font-extrabold font-mono text-teal-700 dark:text-teal-300 tabular-nums">
               {userXp} XP
             </div>
-            <div className="text-[11px] text-teal-600 dark:text-teal-400 group-hover:underline">
-              Level {Math.max(1, Math.floor(userXp / 300) + 1)} Engineer
-            </div>
+            <button
+              type="button"
+              onClick={() => setIsXpModalOpen(true)}
+              className="mt-1 px-2.5 py-1.5 rounded-xl border border-teal-500/40 bg-teal-50/80 dark:bg-teal-950/50 text-teal-800 dark:text-teal-300 hover:bg-gradient-to-r hover:from-[#0F766E] hover:to-[#10B981] hover:text-white hover:border-teal-500 hover:shadow-sm hover:shadow-teal-600/20 hover:-translate-y-0.5 active:translate-y-0 transition-all duration-150 font-semibold text-[11px] inline-flex items-center gap-1 cursor-pointer whitespace-nowrap"
+            >
+              <span>Level {Math.max(1, Math.floor(userXp / 300) + 1)} Engineer →</span>
+            </button>
           </div>
         </div>
 
@@ -383,19 +422,19 @@ export const HomeOverview: React.FC = () => {
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
         
         {/* Today's Priority Tasks */}
-        <div className="rounded-2xl border border-stone-200/80 dark:border-stone-800 bg-white dark:bg-stone-900 p-5 shadow-xs space-y-3">
-          <div className="flex items-center justify-between pb-2 border-b border-stone-100 dark:border-stone-800">
+        <div className="rounded-2xl border border-stone-200/80 dark:border-stone-800 bg-white dark:bg-stone-900 p-5 shadow-xs space-y-3 hover:border-teal-500/70 dark:hover:border-teal-500/70 transition-all duration-200">
+          <div className="flex items-center justify-between pb-2.5 border-b border-stone-100 dark:border-stone-800">
             <h3 className="text-sm font-bold text-stone-900 dark:text-stone-100 flex items-center gap-2">
               <span>Today's Tasks</span>
-              <span className="text-xs font-mono font-normal text-stone-400">
+              <span className="text-xs font-mono font-normal text-stone-400 tabular-nums">
                 ({priorityTasks.filter((t) => t.completed).length}/{priorityTasks.length})
               </span>
             </h3>
             <button
               onClick={() => setActiveView('tasks')}
-              className="text-xs text-teal-700 dark:text-teal-400 font-semibold hover:underline"
+              className="px-3 py-1.5 rounded-xl border border-teal-500/40 bg-teal-50/80 dark:bg-teal-950/50 text-teal-800 dark:text-teal-300 hover:bg-gradient-to-r hover:from-[#0F766E] hover:to-[#10B981] hover:text-white hover:border-teal-500 hover:shadow-sm hover:shadow-teal-600/20 hover:-translate-y-0.5 active:translate-y-0 transition-all duration-150 text-xs font-semibold inline-flex items-center gap-1 cursor-pointer whitespace-nowrap"
             >
-              View All Tasks →
+              <span>View All Tasks →</span>
             </button>
           </div>
 
@@ -408,13 +447,13 @@ export const HomeOverview: React.FC = () => {
                   className={`p-3 rounded-xl border transition-all flex items-center justify-between gap-3 ${
                     isCompleted
                       ? 'border-stone-200/50 bg-stone-50/50 dark:border-stone-800/50 dark:bg-stone-850/30 opacity-60'
-                      : 'border-stone-200/80 dark:border-stone-800 bg-stone-50/30 dark:bg-stone-850/40 hover:border-teal-400/60'
+                      : 'border-stone-200/80 dark:border-stone-800 bg-stone-50/30 dark:bg-stone-850/40 hover:border-teal-500/60 hover:bg-teal-50/30 dark:hover:bg-teal-950/25'
                   }`}
                 >
                   <div className="flex items-center gap-2.5 min-w-0 flex-1">
                     <button
                       onClick={() => handleTaskCheck(task.id, isCompleted)}
-                      className="text-stone-400 hover:text-teal-600 transition-colors shrink-0"
+                      className="text-stone-400 hover:text-teal-600 transition-colors shrink-0 cursor-pointer"
                     >
                       {isCompleted ? (
                         <CheckCircle2 className="w-4 h-4 text-teal-600 fill-teal-100 dark:fill-teal-950" />
@@ -430,10 +469,10 @@ export const HomeOverview: React.FC = () => {
                   </div>
 
                   <div className="flex items-center gap-1.5 shrink-0">
-                    <span className="text-[10px] font-mono text-stone-400">{task.startTime}</span>
+                    <span className="text-[10px] font-mono text-stone-400 tabular-nums">{task.startTime}</span>
                     <button
                       onClick={() => setActiveView('tasks')}
-                      className="p-1 rounded-md text-stone-400 hover:text-teal-600 transition-colors"
+                      className="p-1.5 rounded-lg border border-transparent hover:border-teal-500/40 hover:bg-teal-500/15 text-stone-400 hover:text-teal-600 dark:hover:text-teal-300 transition-all cursor-pointer"
                       title="Edit task in Schedule & Tasks"
                     >
                       <Edit3 className="w-3 h-3" />
@@ -441,7 +480,7 @@ export const HomeOverview: React.FC = () => {
                     {!isCompleted && (
                       <button
                         onClick={() => startZenMode(task)}
-                        className="p-1 rounded-md text-stone-400 hover:text-teal-600"
+                        className="p-1.5 rounded-lg border border-transparent hover:border-teal-500/40 hover:bg-teal-500/15 text-stone-400 hover:text-teal-600 dark:hover:text-teal-300 transition-all cursor-pointer"
                         title="Focus"
                       >
                         <Play className="w-3 h-3 fill-current" />
@@ -455,19 +494,19 @@ export const HomeOverview: React.FC = () => {
         </div>
 
         {/* Today's Classes */}
-        <div className="rounded-2xl border border-stone-200/80 dark:border-stone-800 bg-white dark:bg-stone-900 p-5 shadow-xs space-y-3">
-          <div className="flex items-center justify-between pb-2 border-b border-stone-100 dark:border-stone-800">
+        <div className="rounded-2xl border border-stone-200/80 dark:border-stone-800 bg-white dark:bg-stone-900 p-5 shadow-xs space-y-3 hover:border-teal-500/70 dark:hover:border-teal-500/70 transition-all duration-200">
+          <div className="flex items-center justify-between pb-2.5 border-b border-stone-100 dark:border-stone-800">
             <h3 className="text-sm font-bold text-stone-900 dark:text-stone-100 flex items-center gap-2">
               <span>Today's Classes</span>
-              <span className="text-xs font-mono font-normal text-stone-400">
+              <span className="text-xs font-mono font-normal text-stone-400 tabular-nums">
                 ({todayClasses.length} sessions)
               </span>
             </h3>
             <button
               onClick={() => setActiveView('schedule')}
-              className="text-xs text-teal-700 dark:text-teal-400 font-semibold hover:underline"
+              className="px-3 py-1.5 rounded-xl border border-teal-500/40 bg-teal-50/80 dark:bg-teal-950/50 text-teal-800 dark:text-teal-300 hover:bg-gradient-to-r hover:from-[#0F766E] hover:to-[#10B981] hover:text-white hover:border-teal-500 hover:shadow-sm hover:shadow-teal-600/20 hover:-translate-y-0.5 active:translate-y-0 transition-all duration-150 text-xs font-semibold inline-flex items-center gap-1 cursor-pointer whitespace-nowrap"
             >
-              Full Schedule →
+              <span>Full Schedule →</span>
             </button>
           </div>
 
@@ -486,13 +525,13 @@ export const HomeOverview: React.FC = () => {
                     className={`p-3 rounded-xl border transition-all flex items-center justify-between gap-3 ${
                       isLive
                         ? 'border-teal-500 bg-teal-50/40 dark:border-teal-600 dark:bg-teal-950/30'
-                        : 'border-stone-200/80 dark:border-stone-800 bg-stone-50/30 dark:bg-stone-850/40'
+                        : 'border-stone-200/80 dark:border-stone-800 bg-stone-50/30 dark:bg-stone-850/40 hover:border-teal-500/60 hover:bg-teal-50/30 dark:hover:bg-teal-950/25'
                     }`}
                   >
                     <div className="flex items-center gap-2.5 min-w-0 flex-1">
                       <button
                         onClick={() => handleTaskCheck(cls.id, cls.completed)}
-                        className="text-stone-400 hover:text-teal-600 transition-colors shrink-0"
+                        className="text-stone-400 hover:text-teal-600 transition-colors shrink-0 cursor-pointer"
                       >
                         {cls.completed ? (
                           <CheckCircle2 className="w-4 h-4 text-teal-600 fill-teal-100 dark:fill-teal-950" />
@@ -514,7 +553,7 @@ export const HomeOverview: React.FC = () => {
                             </span>
                           )}
                         </div>
-                        <div className="text-[10px] text-stone-400 font-mono mt-0.5">
+                        <div className="text-[10px] text-stone-400 font-mono mt-0.5 tabular-nums">
                           {cls.startTime} – {cls.endTime} · {isLab ? 'Lab Practical' : 'Lecture'}
                         </div>
                       </div>
@@ -522,7 +561,7 @@ export const HomeOverview: React.FC = () => {
 
                     <button
                       onClick={() => startZenMode(cls)}
-                      className="px-2 py-1 rounded-md text-[11px] font-semibold bg-stone-100 dark:bg-stone-800 hover:bg-stone-200 dark:hover:bg-stone-700 text-stone-700 dark:text-stone-300"
+                      className="px-2.5 py-1.5 rounded-lg border border-teal-500/30 bg-teal-50/70 dark:bg-teal-950/40 hover:bg-gradient-to-r hover:from-[#0F766E] hover:to-[#10B981] hover:text-white hover:border-teal-500 text-teal-800 dark:text-teal-300 text-[11px] font-semibold transition-all cursor-pointer"
                     >
                       Focus
                     </button>

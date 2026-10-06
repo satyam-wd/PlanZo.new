@@ -6,6 +6,8 @@ import { HomeOverview } from './components/HomeOverview';
 import { DailyTimeline } from './components/DailyTimeline';
 import { TasksView } from './components/TasksView';
 import { ScheduleView } from './components/ScheduleView';
+import { ProjectsView } from './components/ProjectsView';
+import { ProfileView } from './components/ProfileView';
 import { AcademicHub } from './components/AcademicHub';
 import { AttendanceTracker } from './components/AttendanceTracker';
 import { AnalyticsView } from './components/AnalyticsView';
@@ -45,7 +47,7 @@ const PlanZoMain: React.FC = () => {
   const [isDarkMode, setIsDarkMode] = useState<boolean>(() => {
     const saved = localStorage.getItem('planzo_theme');
     if (saved) return saved === 'dark';
-    return window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches;
+    return true;
   });
 
   // Apply dark class to html document and body
@@ -61,27 +63,17 @@ const PlanZoMain: React.FC = () => {
     }
   }, [isDarkMode]);
 
-  // Automatically open the Personalization Setup Wizard on first login/app use if schedule is not yet personalized
-  useEffect(() => {
-    if (currentUser?.isAuthenticated) {
-      const hasGeneratedSchedule = localStorage.getItem('planzo_timetable_v1');
-      if (!hasGeneratedSchedule) {
-        setIsPersonalizationWizardOpen(true);
-      }
-    }
-  }, [currentUser?.isAuthenticated, setIsPersonalizationWizardOpen]);
-
-  // GATEWAY AUTHENTICATION CHECK:
+  // GATEWAY AUTHENTICATION CHECK (Protected Routes Guard):
   if (!currentUser || !currentUser.isAuthenticated) {
     return (
-      <div className={`${isDarkMode ? 'dark' : ''} min-h-screen w-full max-w-full overflow-x-hidden bg-stone-100/70 dark:bg-[#070b12] text-stone-900 dark:text-stone-100 font-sans transition-colors`}>
+      <div className={`${isDarkMode ? 'dark' : ''} min-h-screen w-full max-w-full overflow-x-hidden bg-[#07111F] text-white font-sans transition-colors`}>
         <AuthGatewayScreen isDarkMode={isDarkMode} setIsDarkMode={setIsDarkMode} />
       </div>
     );
   }
 
   return (
-    <div className={`${isDarkMode ? 'dark' : ''} min-h-screen w-full max-w-full overflow-x-hidden bg-stone-50/80 dark:bg-[#090d16] text-stone-900 dark:text-stone-100 font-sans transition-colors selection:bg-teal-500/20 flex`}>
+    <div className={`${isDarkMode ? 'dark' : ''} min-h-screen w-full max-w-full overflow-x-hidden bg-stone-50/80 dark:bg-[#07111F] text-stone-900 dark:text-stone-100 font-sans transition-colors selection:bg-[#6C4DFF]/30 flex`}>
       
       {/* 1. Global Left Sidebar Navigation */}
       <SidebarNav
@@ -108,16 +100,16 @@ const PlanZoMain: React.FC = () => {
           
           {/* Back button if in detail sub-view */}
           {activeView !== 'home' && (
-            <div className="flex items-center justify-between pb-1 border-b border-stone-100 dark:border-stone-850">
+            <div className="flex items-center justify-between pb-1 border-b border-stone-100 dark:border-[#1E2E4A]">
               <button
                 onClick={() => setActiveView('home')}
-                className="inline-flex items-center gap-1.5 text-xs font-semibold text-stone-500 hover:text-teal-700 dark:hover:text-teal-400 transition-colors cursor-pointer"
+                className="inline-flex items-center gap-1.5 text-xs font-semibold text-stone-500 dark:text-[#93A4C1] hover:text-[#6C4DFF] dark:hover:text-[#3B9CFF] transition-colors cursor-pointer"
               >
                 <ArrowLeft className="w-3.5 h-3.5" />
-                <span>Return to Overview</span>
+                <span>Return to Command Center</span>
               </button>
-              <span className="text-[10px] font-mono uppercase tracking-wider text-stone-400">
-                PlanZo OS / {activeView}
+              <span className="text-[10px] font-mono uppercase tracking-wider text-stone-400 dark:text-[#687D9C]">
+                Planzo / {activeView === 'home' ? 'dashboard' : activeView === 'schedule' ? 'calendar' : activeView}
               </span>
             </div>
           )}
@@ -128,6 +120,8 @@ const PlanZoMain: React.FC = () => {
             {activeView === 'timeline' && <DailyTimeline />}
             {activeView === 'tasks' && <TasksView onOpenAddTaskModal={() => setIsScheduleModalOpen(true)} />}
             {activeView === 'schedule' && <ScheduleView onOpenAddTaskModal={() => setIsScheduleModalOpen(true)} />}
+            {activeView === 'projects' && <ProjectsView />}
+            {activeView === 'profile' && <ProfileView />}
             {activeView === 'attendance' && <AttendanceTracker />}
             {activeView === 'academic' && <AcademicHub />}
             {activeView === 'analytics' && <AnalyticsView />}
@@ -137,18 +131,18 @@ const PlanZoMain: React.FC = () => {
 
         </main>
 
-        {/* Clean, Minimal Institutional Footer */}
-        <footer className="mt-auto border-t border-stone-200/80 dark:border-stone-850 py-5 bg-white/40 dark:bg-stone-900/30">
-          <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 flex flex-col sm:flex-row items-center justify-between gap-3 text-xs text-stone-500 dark:text-stone-400">
+        {/* Clean Startup Footer */}
+        <footer className="mt-auto border-t border-stone-200/80 dark:border-[#1E2E4A] py-5 bg-white/40 dark:bg-[#0B1324]/50">
+          <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 flex flex-col sm:flex-row items-center justify-between gap-3 text-xs text-stone-500 dark:text-[#93A4C1]">
             <div className="flex items-center gap-2">
-              <span className="font-bold text-stone-800 dark:text-stone-200">PlanZo OS</span>
+              <span className="font-bold text-stone-800 dark:text-white">Planzo</span>
               <span>·</span>
-              <span className="text-teal-700 dark:text-teal-400 font-medium">
-                For the student, by the student, to the student
+              <span className="text-[#6C4DFF] dark:text-[#3B9CFF] font-medium">
+                Plan Smarter. Do Better.
               </span>
             </div>
-            <div className="text-[11px] font-mono text-stone-400">
-              {profile.customCollege || profile.college || 'Engineering College'} · B.Tech Academic Command Center
+            <div className="text-[11px] font-mono text-stone-400 dark:text-[#687D9C]">
+              {profile.customCollege || profile.college || 'Planzo Workspace'} · Protected Session
             </div>
           </div>
         </footer>
@@ -159,12 +153,12 @@ const PlanZoMain: React.FC = () => {
       <div className="fixed bottom-5 right-5 z-40">
         <button
           onClick={() => setIsAiChatbotOpen(true)}
-          className="group flex items-center gap-2 px-3.5 py-2.5 rounded-full bg-teal-700 hover:bg-teal-800 text-white shadow-lg shadow-teal-700/20 border border-teal-500/30 hover:scale-105 active:scale-95 transition-all cursor-pointer"
+          className="group flex items-center gap-2 px-3.5 py-2.5 rounded-full bg-gradient-to-r from-[#6C4DFF] to-[#3B9CFF] hover:from-[#5B3DF5] hover:to-[#298CEB] text-white shadow-lg shadow-[#6C4DFF]/30 border border-white/15 hover:scale-105 active:scale-95 transition-all cursor-pointer"
           title="Open Sarthi AI Copilot"
         >
           <div className="relative">
             <Bot className="w-4 h-4" />
-            <span className="absolute -top-0.5 -right-0.5 w-2 h-2 rounded-full bg-emerald-400 border border-teal-900" />
+            <span className="absolute -top-0.5 -right-0.5 w-2 h-2 rounded-full bg-emerald-400 border border-[#07111F]" />
           </div>
           <span className="text-xs font-bold tracking-tight">Sarthi AI</span>
         </button>
@@ -214,4 +208,5 @@ export default function App() {
     </AppProvider>
   );
 }
+
 

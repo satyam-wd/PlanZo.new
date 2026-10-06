@@ -88,16 +88,16 @@ export const AttendanceTracker: React.FC = () => {
       {/* 2. Top Overview: 4 Clean Executive Metric Cards */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
         {/* Overall Attendance */}
-        <div className="p-5 rounded-2xl border border-stone-200/80 dark:border-stone-800 bg-white dark:bg-stone-900 shadow-xs space-y-1">
-          <div className="flex items-center justify-between text-xs text-stone-500">
+        <div className="p-5 rounded-2xl border border-stone-200/80 dark:border-stone-800 bg-white dark:bg-stone-900 shadow-xs space-y-1 hover:border-teal-500 dark:hover:border-teal-500/80 hover:bg-gradient-to-br hover:from-teal-50/50 hover:to-white dark:hover:from-teal-950/35 dark:hover:to-stone-900 hover:shadow-md hover:shadow-teal-600/10 hover:-translate-y-0.5 transition-all duration-200 group">
+          <div className="flex items-center justify-between text-xs text-stone-500 group-hover:text-teal-700 dark:group-hover:text-teal-400 transition-colors">
             <span>Overall Attendance</span>
             {isOverallSafe ? (
-              <ShieldCheck className="w-4 h-4 text-emerald-600" />
+              <ShieldCheck className="w-4 h-4 text-emerald-600 group-hover:scale-110 transition-transform" />
             ) : (
-              <ShieldAlert className="w-4 h-4 text-rose-600" />
+              <ShieldAlert className="w-4 h-4 text-rose-600 group-hover:scale-110 transition-transform" />
             )}
           </div>
-          <div className="text-2xl sm:text-3xl font-extrabold font-mono text-stone-900 dark:text-stone-100 tabular-nums">
+          <div className="text-2xl sm:text-3xl font-extrabold font-mono text-stone-900 dark:text-stone-100 group-hover:text-teal-700 dark:group-hover:text-teal-300 transition-colors tabular-nums">
             {simulatedBunks > 0 ? simulatedPercentage : overallAttendancePercentage}%
           </div>
           <div className="text-[11px] text-stone-400">
@@ -106,9 +106,9 @@ export const AttendanceTracker: React.FC = () => {
         </div>
 
         {/* 75% Target */}
-        <div className="p-5 rounded-2xl border border-stone-200/80 dark:border-stone-800 bg-white dark:bg-stone-900 shadow-xs space-y-1">
-          <div className="text-xs text-stone-500">Required Target</div>
-          <div className="text-2xl sm:text-3xl font-extrabold font-mono text-stone-900 dark:text-stone-100 tabular-nums">
+        <div className="p-5 rounded-2xl border border-stone-200/80 dark:border-stone-800 bg-white dark:bg-stone-900 shadow-xs space-y-1 hover:border-teal-500 dark:hover:border-teal-500/80 hover:bg-gradient-to-br hover:from-teal-50/50 hover:to-white dark:hover:from-teal-950/35 dark:hover:to-stone-900 hover:shadow-md hover:shadow-teal-600/10 hover:-translate-y-0.5 transition-all duration-200 group">
+          <div className="text-xs text-stone-500 group-hover:text-teal-700 dark:group-hover:text-teal-400 transition-colors">Required Target</div>
+          <div className="text-2xl sm:text-3xl font-extrabold font-mono text-stone-900 dark:text-stone-100 group-hover:text-teal-700 dark:group-hover:text-teal-300 transition-colors tabular-nums">
             {targetThreshold}%
           </div>
           <div className="text-[11px] text-stone-400">
@@ -117,8 +117,8 @@ export const AttendanceTracker: React.FC = () => {
         </div>
 
         {/* Subjects at Risk */}
-        <div className="p-5 rounded-2xl border border-stone-200/80 dark:border-stone-800 bg-white dark:bg-stone-900 shadow-xs space-y-1">
-          <div className="text-xs text-stone-500">Subjects At Risk</div>
+        <div className="p-5 rounded-2xl border border-stone-200/80 dark:border-stone-800 bg-white dark:bg-stone-900 shadow-xs space-y-1 hover:border-teal-500 dark:hover:border-teal-500/80 hover:bg-gradient-to-br hover:from-teal-50/50 hover:to-white dark:hover:from-teal-950/35 dark:hover:to-stone-900 hover:shadow-md hover:shadow-teal-600/10 hover:-translate-y-0.5 transition-all duration-200 group">
+          <div className="text-xs text-stone-500 group-hover:text-teal-700 dark:group-hover:text-teal-400 transition-colors">Subjects At Risk</div>
           <div className={`text-2xl sm:text-3xl font-extrabold font-mono tabular-nums ${
             atRiskCount > 0 ? 'text-rose-600 dark:text-rose-400' : 'text-emerald-600 dark:text-emerald-400'
           }`}>
@@ -130,9 +130,9 @@ export const AttendanceTracker: React.FC = () => {
         </div>
 
         {/* Classes that can be missed */}
-        <div className="p-5 rounded-2xl border border-stone-200/80 dark:border-stone-800 bg-white dark:bg-stone-900 shadow-xs space-y-1">
-          <div className="text-xs text-stone-500">Classes Can Be Missed</div>
-          <div className="text-2xl sm:text-3xl font-extrabold font-mono text-stone-900 dark:text-stone-100 tabular-nums">
+        <div className="p-5 rounded-2xl border border-stone-200/80 dark:border-stone-800 bg-white dark:bg-stone-900 shadow-xs space-y-1 hover:border-teal-500 dark:hover:border-teal-500/80 hover:bg-gradient-to-br hover:from-teal-50/50 hover:to-white dark:hover:from-teal-950/35 dark:hover:to-stone-900 hover:shadow-md hover:shadow-teal-600/10 hover:-translate-y-0.5 transition-all duration-200 group">
+          <div className="text-xs text-stone-500 group-hover:text-teal-700 dark:group-hover:text-teal-400 transition-colors">Classes Can Be Missed</div>
+          <div className="text-2xl sm:text-3xl font-extrabold font-mono text-stone-900 dark:text-stone-100 group-hover:text-teal-700 dark:group-hover:text-teal-300 transition-colors tabular-nums">
             {overallSafeBunks}
           </div>
           <div className="text-[11px] text-stone-400">
@@ -204,10 +204,10 @@ export const AttendanceTracker: React.FC = () => {
           return (
             <div
               key={sub.subjectId}
-              className={`rounded-2xl border p-5 shadow-xs flex flex-col justify-between transition-all ${
+              className={`rounded-2xl border p-5 shadow-xs flex flex-col justify-between transition-all duration-200 hover:-translate-y-0.5 hover:shadow-md hover:shadow-teal-600/10 group ${
                 status === 'risk'
-                  ? 'border-rose-300 dark:border-rose-900 bg-rose-50/15 dark:bg-rose-950/10'
-                  : 'border-stone-200/80 dark:border-stone-800 bg-white dark:bg-stone-900'
+                  ? 'border-rose-300 dark:border-rose-900 bg-rose-50/15 dark:bg-rose-950/10 hover:border-teal-500 dark:hover:border-teal-500/80'
+                  : 'border-stone-200/80 dark:border-stone-800 bg-white dark:bg-stone-900 hover:border-teal-500 dark:hover:border-teal-500/80 hover:bg-gradient-to-br hover:from-teal-50/40 hover:to-white dark:hover:from-teal-950/30 dark:hover:to-stone-900'
               }`}
             >
               <div>
