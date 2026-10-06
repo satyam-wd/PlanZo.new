@@ -37,17 +37,18 @@ app.get('/api/chat', (_req, res) => {
 });
 
 // Initialize GoogleGenAI server-side with required telemetry User-Agent
-const apiKey = process.env.GEMINI_API_KEY;
-const ai = apiKey
-  ? new GoogleGenAI({
-      apiKey,
-      httpOptions: {
-        headers: {
-          'User-Agent': 'aistudio-build',
-        },
+function getAiClient(): GoogleGenAI | null {
+  const key = process.env.GEMINI_API_KEY;
+  if (!key) return null;
+  return new GoogleGenAI({
+    apiKey: key,
+    httpOptions: {
+      headers: {
+        'User-Agent': 'aistudio-build',
       },
-    })
-  : null;
+    },
+  });
+}
 
 // Endpoint: Student Life AI Chatbot (PlanZo Coach / Sarthi AI)
 app.post('/api/chat', async (req, res) => {
@@ -58,6 +59,8 @@ app.post('/api/chat', async (req, res) => {
     if (!userMessage && !attachment?.data) {
       return res.status(400).json({ error: 'Message or attachment is required' });
     }
+
+    const ai = getAiClient();
 
     const systemInstruction = `You are Sarthi, an expert, empathetic, and exceptionally practical senior B.Tech mentor & academic copilot on PlanZo.
 Student Academic Context:
@@ -184,6 +187,7 @@ Core Principles:
 app.post('/api/recalibrate', async (req, res) => {
   try {
     const { items, missedItemTitle, reason } = req.body;
+    const ai = getAiClient();
 
     if (ai) {
       const prompt = `You are a dynamic scheduler for an engineering student.
@@ -229,6 +233,7 @@ Return ONLY valid JSON matching this schema:
 app.post('/api/syllabus-planner', async (req, res) => {
   try {
     const { subject, daysRemaining, currentLevel } = req.body;
+    const ai = getAiClient();
 
     if (ai) {
       const prompt = `For the engineering subject "${subject}", generate an accelerated study roadmap for a student with ${daysRemaining || 7} days remaining who is currently at "${currentLevel || 'Beginner'}" level.

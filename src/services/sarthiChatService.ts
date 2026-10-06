@@ -39,7 +39,10 @@ export function cleanAiResponseFormat(text: string): string {
     .trim();
 }
 
-const DEV_BACKEND_ENDPOINT = 'https://ais-dev-xwtqs7ljetyij5npxh755f-893813178872.asia-east1.run.app/api/chat';
+const FALLBACK_BACKEND_ENDPOINTS = [
+  'https://ais-pre-4jxtpt4bcbmoak3lbjynqw-700559720665.asia-southeast1.run.app/api/chat',
+  'https://ais-dev-4jxtpt4bcbmoak3lbjynqw-700559720665.asia-southeast1.run.app/api/chat',
+];
 
 /**
  * Primary Sarthi AI Query Handler
@@ -56,9 +59,9 @@ export async function querySarthiAi(payload: ChatRequestPayload): Promise<string
     typeof window !== 'undefined' &&
     window.location.origin &&
     !window.location.origin.includes('localhost') &&
-    !window.location.origin.includes('ais-dev')
+    !window.location.origin.includes('4jxtpt4bcbmoak3lbjynqw')
   ) {
-    endpointsToTry.push(DEV_BACKEND_ENDPOINT);
+    endpointsToTry.push(...FALLBACK_BACKEND_ENDPOINTS);
   }
 
   let lastErrorMessage = '';
