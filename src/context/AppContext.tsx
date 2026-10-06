@@ -201,11 +201,16 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     };
   });
 
-  // 2. Timetable State
+  // 2. Timetable State (Minimum 10 daily tasks, with 4 study tasks of 1 hour each and zero overlaps)
   const [timetable, setTimetable] = useState<TimetableItem[]>(() => {
     const saved = localStorage.getItem(STORAGE_KEYS.TIMETABLE) || localStorage.getItem('planzo_timetable_v3');
     if (saved) {
-      try { return JSON.parse(saved); } catch (e) {}
+      try {
+        const parsed = JSON.parse(saved);
+        if (Array.isArray(parsed) && parsed.length >= 10) {
+          return parsed;
+        }
+      } catch (e) {}
     }
     return [
       {
@@ -219,21 +224,21 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         notes: 'Morning physical workout to activate energy and build peak mental stamina.',
       },
       {
-        id: 'routine-mit-morning',
-        title: '⭐ Morning Deep Study: C Programming & DSA (Morning Priority Session 1)',
+        id: 'routine-study-1-morning',
+        title: '⭐ Morning Deep Study (1 Hr): C Programming & DSA',
         category: 'study',
         startTime: '07:40',
         endTime: '08:40',
         completed: false,
         cognitiveWeight: 4,
-        notes: 'Dedicated 1-hour priority morning deep work on Most Important Task.',
+        notes: 'Dedicated 1-hour morning deep study session on Most Important Task.',
       },
       {
         id: 'routine-2',
         title: 'Breakfast & Commute to Campus',
         category: 'chill',
         startTime: '08:40',
-        endTime: '10:30',
+        endTime: '10:00',
         completed: false,
         cognitiveWeight: 1,
         notes: 'Nutritious breakfast, campus travel, and settling into lectures.',
@@ -242,77 +247,87 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         id: 'routine-college',
         title: 'Institute — Full College Schedule (Lectures & Labs)',
         category: 'lecture',
-        startTime: '10:30',
-        endTime: '17:30',
+        startTime: '10:00',
+        endTime: '17:00',
         completed: false,
         cognitiveWeight: 4,
-        notes: 'One unified college schedule for all lectures & labs (10:30 – 17:30). Mark once for the entire day.',
+        notes: 'One unified college schedule for all lectures & labs (10:00 – 17:00). Mark once for the entire day.',
       },
       {
         id: 'routine-3',
         title: 'Campus Departure & Evening Chai / Refreshment',
         category: 'chill',
-        startTime: '17:30',
-        endTime: '18:00',
+        startTime: '17:00',
+        endTime: '17:25',
         completed: false,
         cognitiveWeight: 1,
         notes: 'Evening tea, decompression and transition back from campus.',
       },
       {
         id: 'routine-outdoor-evening',
-        title: '🌳 Shaam Outdoor Habit: Outdoor Walk & Campus Fresh Air',
+        title: '🌳 Evening Outdoor Habit: Outdoor Walk & Campus Fresh Air',
         category: 'habit',
-        startTime: '18:00',
-        endTime: '18:35',
+        startTime: '17:25',
+        endTime: '17:55',
         completed: false,
         cognitiveWeight: 1,
-        notes: 'Evening outdoor activity, fresh air walk or sports to decompress after lectures.',
+        notes: 'Evening outdoor activity, fresh air walk or sports to recharge after lectures.',
       },
       {
-        id: 'routine-primary-focus',
-        title: '🎯 Primary Semester Focus: Skills & Practical Coding Sprint',
+        id: 'routine-study-2-primary-focus',
+        title: '🎯 Evening Study (1 Hr): Engineering Mathematics - I & Problem Solving',
         category: 'study',
-        startTime: '18:35',
-        endTime: '20:05',
+        startTime: '17:55',
+        endTime: '18:55',
         completed: false,
         cognitiveWeight: 4,
-        notes: 'Dedicated 1 hour 30 minutes priority study block aligned with your semester focus.',
+        notes: 'Dedicated 1-hour evening study block aligned with your semester focus.',
+      },
+      {
+        id: 'routine-habit-extra',
+        title: '⚡ Daily Habit: Daily Coding / DSA & Hydration Check',
+        category: 'habit',
+        startTime: '18:55',
+        endTime: '19:20',
+        completed: false,
+        cognitiveWeight: 2,
+        notes: 'Daily consistency block for coding practice and hydration goal.',
       },
       {
         id: 'routine-dinner',
         title: 'Dinner & Mindful Decompression',
         category: 'chill',
-        startTime: '20:05',
-        endTime: '21:00',
+        startTime: '19:20',
+        endTime: '20:00',
         completed: false,
         cognitiveWeight: 1,
         notes: 'Dinner with friends or family, and evening wind-down.',
       },
       {
-        id: 'routine-mit-night',
-        title: '⭐ Raat Deep Study: C Programming & Core Concepts (Night Priority Session 2)',
+        id: 'routine-study-3-night',
+        title: '⭐ Night Deep Study (1 Hr): C Programming & Core Concepts',
+        category: 'study',
+        startTime: '20:00',
+        endTime: '21:00',
+        completed: false,
+        cognitiveWeight: 4,
+        notes: 'Dedicated 1-hour night study session for your Most Important Task.',
+      },
+      {
+        id: 'routine-study-4-additional-study',
+        title: '📘 Academic Study (1 Hr): Engineering Physics — Revision & Notes',
         category: 'study',
         startTime: '21:00',
         endTime: '22:00',
         completed: false,
-        cognitiveWeight: 4,
-        notes: 'Second dedicated 1-hour session for your Most Important Task at night.',
-      },
-      {
-        id: 'routine-additional-study',
-        title: 'Academic Study: Engineering Mathematics - I (Core Review)',
-        category: 'study',
-        startTime: '22:00',
-        endTime: '22:50',
-        completed: false,
         cognitiveWeight: 3,
-        notes: '50-minute focused revision session on core semester syllabus.',
+        notes: 'Dedicated 1-hour focused revision session on core semester syllabus.',
       },
       {
         id: 'routine-night',
         title: '🌙 Night Wind-down: Tomorrow Timetable Sync & Rest',
         category: 'habit',
-        startTime: '22:50',
+        startTime: '22:00',
         endTime: '23:30',
         completed: false,
         cognitiveWeight: 1,
