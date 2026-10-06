@@ -1706,4 +1706,3 @@ export const SEM_2_DETAILED_NOTES: Record<string, FirstYearSubjectNotesDetail> =
     ],
   },
 };
-

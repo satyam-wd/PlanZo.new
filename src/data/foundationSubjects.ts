@@ -577,4 +577,3 @@ export function getFoundationSemesterSubjects(semester: number): SubjectCourse[]
   }
   return SEM_1_FOUNDATION_SUBJECTS;
 }
-
