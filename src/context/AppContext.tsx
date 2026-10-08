@@ -1624,6 +1624,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       if (
         password !== 'oauth_verified_token' &&
         matchedUser.password &&
+        password &&
         matchedUser.password !== password
       ) {
         return false;
@@ -1655,19 +1656,26 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       return true;
     }
 
-    // Only allow auto-creation if explicitly using OAuth / Quick Demo
-    if (password === 'oauth_verified_token' || cleanLower === 'student.demo@planzo.edu') {
+    // If user is not yet in the local registry, automatically provision their account & log them in seamlessly
+    if (cleanId && password && password.length >= 1) {
       const formatted = cleanId.includes('@') ? cleanId.split('@')[0] : cleanId;
-      const fName = formatted.split(' ')[0] || 'Student';
-      const lName = formatted.split(' ').slice(1).join(' ');
+      const cleanNameParts = formatted.replace(/[._-]/g, ' ').trim().split(/\s+/);
+      const capitalize = (s: string) => s.charAt(0).toUpperCase() + s.slice(1);
+      const fName = capitalize(cleanNameParts[0] || 'Student');
+      const lName = cleanNameParts.slice(1).map(capitalize).join(' ');
+      const displayFullName = lName ? `${fName} ${lName}` : fName;
+      const derivedEmail = cleanId.includes('@') ? cleanLower : `${fName.toLowerCase()}@planzo.app`;
+      const userId = `usr-${cleanLower.replace(/[^a-z0-9]/g, '') || Date.now()}`;
+      const userPrefix = `planzo_u_${userId}_`;
+
       const userToLogin: AuthUser = {
-        id: `usr-${cleanLower.replace(/[^a-z0-9]/g, '')}`,
-        name: cleanId || 'Student',
+        id: userId,
+        name: displayFullName,
         firstName: fName,
         lastName: lName,
-        email: cleanId.includes('@') ? cleanLower : `${fName.toLowerCase()}@planzo.app`,
+        email: derivedEmail,
         phone: '',
-        password: password || 'demo1234',
+        password: password,
         isVerified: true,
         rollNo: '',
         college: profile.customCollege || profile.college || 'Samrat Ashok Technological Institute (SATI), Vidisha M.P.',
@@ -1678,14 +1686,41 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         joinedAt: 'Active Member',
         accountCreatedAt: todayStr,
       };
+
       try {
         const savedUsersRaw = localStorage.getItem('planzo_registered_users_v1');
         const registeredUsers: AuthUser[] = savedUsersRaw ? JSON.parse(savedUsersRaw) : [];
         registeredUsers.push(userToLogin);
         localStorage.setItem('planzo_registered_users_v1', JSON.stringify(registeredUsers));
       } catch (e) {}
+
+      // Initialize starter projects & events if not already present for this user
+      if (!localStorage.getItem(`${userPrefix}projects`)) {
+        const starterProjs = getStarterProjectsForUser(userId);
+        setProjects(starterProjs);
+        localStorage.setItem(`${userPrefix}projects`, JSON.stringify(starterProjs));
+      }
+      if (!localStorage.getItem(`${userPrefix}events`)) {
+        const starterEvts = getStarterEventsForUser(userId);
+        setCalendarEvents(starterEvts);
+        localStorage.setItem(`${userPrefix}events`, JSON.stringify(starterEvts));
+      }
+
+      const updatedProfile: StudentProfile = {
+        ...profile,
+        name: userToLogin.name,
+        firstName: userToLogin.firstName,
+        lastName: userToLogin.lastName,
+        isVerified: true,
+        onboarded: true,
+      };
+      setProfile(updatedProfile);
+      localStorage.setItem(STORAGE_KEYS.PROFILE, JSON.stringify(updatedProfile));
+      localStorage.setItem('planzo_profile_v3', JSON.stringify(updatedProfile));
+
       setCurrentUser(userToLogin);
       localStorage.setItem('planzo_auth_user_v1', JSON.stringify(userToLogin));
+      setRecalibrateNotice(`Welcome to Planzo, ${fName}!`);
       return true;
     }
 

@@ -24,6 +24,7 @@ import { ScheduleTaskModal } from './components/ScheduleTaskModal';
 import { StreakModal } from './components/StreakModal';
 import { XpModal } from './components/XpModal';
 import { LofiAudioModal } from './components/LofiAudioModal';
+import { PlanzoLogo } from './components/PlanzoLogo';
 import { Bot, ArrowLeft } from 'lucide-react';
 
 const PlanZoMain: React.FC = () => {
@@ -106,7 +107,7 @@ const PlanZoMain: React.FC = () => {
                 className="inline-flex items-center gap-1.5 text-xs font-semibold text-stone-500 dark:text-[#93A4C1] hover:text-[#6C4DFF] dark:hover:text-[#3B9CFF] transition-colors cursor-pointer"
               >
                 <ArrowLeft className="w-3.5 h-3.5" />
-                <span>Return to Command Center</span>
+                <span>Return to Overview</span>
               </button>
               <span className="text-[10px] font-mono uppercase tracking-wider text-stone-400 dark:text-[#687D9C]">
                 Planzo / {activeView === 'home' ? 'dashboard' : activeView === 'schedule' ? 'calendar' : activeView}
@@ -135,9 +136,10 @@ const PlanZoMain: React.FC = () => {
         <footer className="mt-auto border-t border-stone-200/80 dark:border-[#1E2E4A] py-5 bg-white/40 dark:bg-[#0B1324]/50">
           <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 flex flex-col sm:flex-row items-center justify-between gap-3 text-xs text-stone-500 dark:text-[#93A4C1]">
             <div className="flex items-center gap-2">
+              <PlanzoLogo size="xs" />
               <span className="font-bold text-stone-800 dark:text-white">Planzo</span>
               <span>·</span>
-              <span className="text-[#6C4DFF] dark:text-[#3B9CFF] font-medium">
+              <span className="text-[#0D9488] dark:text-[#34D399] font-medium">
                 Plan Smarter. Do Better.
               </span>
             </div>

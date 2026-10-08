@@ -17,6 +17,7 @@ import {
 import { useApp } from '../context/AppContext';
 import { playTaskCompleteSound } from '../utils/audioSynth';
 import { fireConfetti } from '../utils/audioVibes';
+import { PlanzoLogo } from './PlanzoLogo';
 
 interface AuthGatewayScreenProps {
   isDarkMode: boolean;
@@ -24,13 +25,15 @@ interface AuthGatewayScreenProps {
 }
 
 export const AuthGatewayScreen: React.FC<AuthGatewayScreenProps> = () => {
-  const { signUp, signIn, setIsPersonalizationWizardOpen } = useApp();
+  const { signUp, signIn, setActiveView, setIsPersonalizationWizardOpen } = useApp();
 
   // Mode: 'login' | 'signup' | 'forgot'
   const [mode, setMode] = useState<'login' | 'signup' | 'forgot'>('login');
 
   // Login Form States
-  const [loginIdentifier, setLoginIdentifier] = useState('');
+  const [loginIdentifier, setLoginIdentifier] = useState(() => {
+    return localStorage.getItem('planzo_remembered_user') || '';
+  });
   const [loginPassword, setLoginPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [rememberMe, setRememberMe] = useState(true);
@@ -61,23 +64,30 @@ export const AuthGatewayScreen: React.FC<AuthGatewayScreenProps> = () => {
       return;
     }
 
-    if (!loginPassword || loginPassword.length < 4) {
-      setErrorMsg('Password must be at least 4 characters.');
+    if (!loginPassword) {
+      setErrorMsg('Please enter your password.');
       return;
     }
 
     setIsLoading(true);
     if (rememberMe) {
       localStorage.setItem('planzo_remembered_user', cleanId);
+    } else {
+      localStorage.removeItem('planzo_remembered_user');
     }
 
     setTimeout(() => {
       const ok = signIn(cleanId, loginPassword);
       setIsLoading(false);
       if (ok) {
+        playTaskCompleteSound();
+        fireConfetti(45);
         setSuccessMsg('Welcome back! Loading your Planzo workspace...');
+        setActiveView('home');
+      } else {
+        setErrorMsg('Incorrect password for this account. Please try again or reset your password.');
       }
-    }, 320);
+    }, 250);
   };
 
   // 2. Handle Sign Up
@@ -190,22 +200,8 @@ export const AuthGatewayScreen: React.FC<AuthGatewayScreenProps> = () => {
           <div className="lg:col-span-7 flex flex-col justify-between space-y-6 lg:space-y-8 lg:pr-6">
             {/* Top Brand Identity + Tagline */}
             <div className="flex items-center justify-between lg:justify-start gap-4">
-              <div className="flex items-center gap-3">
-                <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-[#0F766E] to-[#10B981] flex items-center justify-center shadow-lg shadow-teal-600/25 border border-white/15">
-                  <svg
-                    className="w-5 h-5 text-white"
-                    viewBox="0 0 24 24"
-                    fill="none"
-                    stroke="currentColor"
-                    strokeWidth="2.4"
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                  >
-                    <path d="M12 2L2 7l10 5 10-5-10-5z" />
-                    <path d="M2 17l10 5 10-5" />
-                    <path d="M2 12l10 5 10-5" />
-                  </svg>
-                </div>
+              <div className="flex items-center gap-3.5">
+                <PlanzoLogo size="lg" className="ring-1 ring-white/20" />
                 <div>
                   <div className="flex items-center gap-2.5">
                     <span className="text-xl sm:text-2xl font-extrabold tracking-tight text-white">

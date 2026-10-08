@@ -1,6 +1,7 @@
 // Planzo Top Header
 import React, { useState } from 'react';
 import { useApp } from '../context/AppContext';
+import { PlanzoLogo } from './PlanzoLogo';
 import {
   Menu,
   Plus,
@@ -33,11 +34,10 @@ export const TopHeader: React.FC<TopHeaderProps> = ({
   const [isUserMenuOpen, setIsUserMenuOpen] = useState(false);
 
   const viewTitles: Record<string, { title: string; subtitle: string }> = {
-    home: { title: 'Command Center', subtitle: 'Plan Smarter. Do Better.' },
-    timeline: { title: 'Daily Timeline', subtitle: 'Time-Blocked Daily Routine' },
-    tasks: { title: 'Tasks', subtitle: 'Priority Action Queue & Daily Schedule' },
-    schedule: { title: 'Calendar & Events', subtitle: 'Schedule, Deadlines & Time Blocks' },
-    projects: { title: 'Projects', subtitle: 'Active Workspaces & Milestones' },
+    home: { title: 'Overview', subtitle: 'Plan Smarter. Do Better.' },
+    timeline: { title: 'My Day', subtitle: 'Time-Blocked Daily Routine' },
+    tasks: { title: 'Schedule and Tasks', subtitle: 'Priority Action Queue & Daily Schedule' },
+    schedule: { title: 'My Day', subtitle: 'Schedule, Deadlines & Time Blocks' },
     profile: { title: 'User Profile', subtitle: 'Account & Personal Details' },
     attendance: { title: 'Attendance Guard', subtitle: '75% AICTE Monitoring' },
     academic: { title: 'Academic Vault', subtitle: 'Syllabus, PYQs & Notes' },
@@ -59,6 +59,14 @@ export const TopHeader: React.FC<TopHeaderProps> = ({
         >
           <Menu className="w-5 h-5" />
         </button>
+
+        <div
+          onClick={() => setActiveView('home')}
+          className="lg:hidden cursor-pointer shrink-0"
+          title="Planzo Overview"
+        >
+          <PlanzoLogo size="sm" />
+        </div>
 
         <div>
           <div className="flex items-center gap-2">

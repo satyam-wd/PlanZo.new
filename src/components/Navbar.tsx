@@ -1,6 +1,7 @@
 // PlanZo Top Navbar
 import React, { useState } from 'react';
 import { useApp } from '../context/AppContext';
+import { PlanzoLogo } from './PlanzoLogo';
 import {
   Sun,
   Moon,
@@ -87,9 +88,7 @@ export const Navbar: React.FC<NavbarProps> = ({ onOpenOnboarding, isDarkMode, se
                 className="flex items-center gap-2.5 cursor-pointer shrink-0 group text-left"
                 title="Go to Overview"
               >
-                <div className="w-8 h-8 rounded-xl bg-gradient-to-tr from-teal-700 to-emerald-600 dark:from-teal-600 dark:to-emerald-500 text-white flex items-center justify-center font-bold text-sm tracking-tight shadow-xs">
-                  P
-                </div>
+                <PlanzoLogo size="sm" className="ring-1 ring-stone-200/60 dark:ring-white/15" />
                 <div>
                   <div className="flex items-center gap-1.5">
                     <span className="font-bold text-base text-stone-900 dark:text-stone-100 tracking-tight">

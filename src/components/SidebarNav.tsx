@@ -1,6 +1,7 @@
 // Planzo Sidebar Navigation
 import React from 'react';
 import { useApp } from '../context/AppContext';
+import { PlanzoLogo } from './PlanzoLogo';
 import {
   LayoutDashboard,
   Clock,
@@ -43,11 +44,9 @@ export const SidebarNav: React.FC<SidebarNavProps> = ({
   const { activeView, setActiveView, profile, currentUser, signOut, setIsPersonalizationWizardOpen } = useApp();
 
   const primaryNav: NavItem[] = [
-    { id: 'home', label: 'Command Center', icon: LayoutDashboard },
-    { id: 'tasks', label: 'Tasks', icon: CheckSquare },
-    { id: 'schedule', label: 'Calendar', icon: Calendar },
-    { id: 'projects', label: 'Projects', icon: FolderKanban },
-    { id: 'timeline', label: 'Daily Timeline', icon: Clock },
+    { id: 'home', label: 'Overview', icon: LayoutDashboard },
+    { id: 'timeline', label: 'My Day', icon: Clock },
+    { id: 'tasks', label: 'Schedule and Tasks', icon: CheckSquare },
     { id: 'attendance', label: 'Attendance', icon: ShieldCheck },
     { id: 'academic', label: 'Academics', icon: BookOpen },
     { id: 'analytics', label: 'Analytics', icon: BarChart2 },
@@ -84,9 +83,7 @@ export const SidebarNav: React.FC<SidebarNavProps> = ({
               onClick={() => handleNavClick('home')}
               className="flex items-center gap-2.5 cursor-pointer"
             >
-              <div className="w-8 h-8 rounded-xl bg-gradient-to-br from-[#6C4DFF] to-[#3B9CFF] text-white flex items-center justify-center font-bold text-sm tracking-tight shadow-md shadow-[#6C4DFF]/25">
-                P
-              </div>
+              <PlanzoLogo size="sm" className="ring-1 ring-stone-200/60 dark:ring-white/15" />
               <div className="flex flex-col">
                 <div className="flex items-center gap-1.5">
                   <span className="font-extrabold text-stone-900 dark:text-white tracking-tight text-base font-display">
